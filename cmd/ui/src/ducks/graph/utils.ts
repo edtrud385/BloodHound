@@ -16,12 +16,13 @@
 
 import AbstractGraph, { Attributes } from 'graphology-types';
 import Sigma from 'sigma';
-import { CameraState, Coordinates, Extent, NodeDisplayData } from 'sigma/types';
-import { graphExtent } from 'sigma/utils';
+import { Coordinates, Extent, NodeDisplayData } from 'sigma/types';
+import { visibleExtent } from 'src/rendering/legacyView';
 
 export const GROUP_SPREAD = 0.06;
 export const MIN_CAMERA_RATIO = 0.5;
-export const MAX_CAMERA_RATIO = 15;
+// Raised from upstream's 15 so graphs with thousands of nodes can still be fitted on one screen.
+export const MAX_CAMERA_RATIO = 500;
 
 /** Node drags shorter than this distance are considered accidental and handled as clicks */
 export const DRAG_THRESHOLD = 8;
@@ -169,41 +170,30 @@ const graphGetMidpoint = (graphExtent: { x: Extent; y: Extent }): Coordinates =>
     return { x: midX, y: midY };
 };
 
+/** Screen-space margin (px) kept around the fitted graph so edge-most labels are not clipped. */
+const FIT_PADDING_PX = 80;
+
+/**
+ * Fit the whole (visible) graph on screen, Legacy-style. Unlike upstream, this always
+ * fits rather than only zooming out on overflow, and it never magnifies past 1:1.
+ */
 const centerCameraOnGraph = (sigma: Sigma<AbstractGraph<Attributes, Attributes, Attributes>>): void => {
-    const graph = sigma.getGraph();
-    const extent = graphExtent(graph);
+    const extent = visibleExtent(sigma.getGraph() as any);
     const camera = sigma.getCamera();
-    const currentRatio = camera.ratio;
-    const newCameraState: CameraState = camera.getState();
+    const { width, height } = sigma.getDimensions();
 
-    // determine if we need to zoom the camera out by comparing the left edge of the graph and the left edge of the current frame
-    const { x: xGraphMin, y: yGraphMin } = graphToFramedGraph(sigma, { x: extent.x[0], y: extent.y[0] });
-    const { x: xGraphMax, y: yGraphMax } = graphToFramedGraph(sigma, { x: extent.x[1], y: extent.y[1] });
-    const { x1: xFrameMin, x2: xFrameMax, y1: yFrameMin, y2: yFrameMax, height: frameHeight } = sigma.viewRectangle();
-    const graphHeight = yGraphMax - yGraphMin;
-    const graphWidth = xGraphMax - xGraphMin;
-    const frameWidth = xFrameMax - xFrameMin;
+    const graphWidth = extent.x[1] - extent.x[0];
+    const graphHeight = extent.y[1] - extent.y[0];
+    const usableWidth = Math.max(width - 2 * FIT_PADDING_PX, 1);
+    const usableHeight = Math.max(height - 2 * FIT_PADDING_PX, 1);
 
-    // the graph lies beyond the edge of the current frame so zoom out by some factor
-    if (xGraphMin < xFrameMin || xGraphMax > xFrameMax || yGraphMin < yFrameMin || yGraphMax > yFrameMax) {
-        const frameHypotenuse = Math.hypot(frameWidth, frameHeight);
-        const graphHypotenuse = Math.hypot(graphWidth, graphHeight);
-
-        let ratio =
-            currentRatio *
-            Math.max(graphHypotenuse / frameHypotenuse, graphHeight / frameHeight, graphWidth / frameWidth) *
-            1.1;
-
-        if (ratio < MIN_CAMERA_RATIO) ratio = MIN_CAMERA_RATIO;
-        if (ratio > MAX_CAMERA_RATIO) ratio = MAX_CAMERA_RATIO;
-
-        newCameraState.ratio = ratio;
-        newCameraState.x = 0.5;
-        newCameraState.y = 0.5;
-    }
+    // The custom bbox maps one graph unit to one pixel at ratio 1, so the fit ratio is a plain size ratio.
+    let ratio = Math.max(graphWidth / usableWidth, graphHeight / usableHeight, 1);
+    if (ratio < MIN_CAMERA_RATIO) ratio = MIN_CAMERA_RATIO;
+    if (ratio > MAX_CAMERA_RATIO) ratio = MAX_CAMERA_RATIO;
 
     camera.animate(
-        newCameraState,
+        { ...camera.getState(), x: 0.5, y: 0.5, ratio },
         {
             easing: 'quadraticOut',
             duration: 250,
@@ -215,7 +205,7 @@ const centerCameraOnGraph = (sigma: Sigma<AbstractGraph<Attributes, Attributes, 
 };
 
 const calculateNewBBox = (sigma: Sigma): { x: Extent; y: Extent } => {
-    const originalExtent = graphExtent(sigma.getGraph());
+    const originalExtent = visibleExtent(sigma.getGraph() as any);
     const midpoint = graphGetMidpoint(originalExtent);
     const { width, height } = sigma.getDimensions();
 

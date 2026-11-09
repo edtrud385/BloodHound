@@ -94,6 +94,8 @@ const SigmaChart = forwardRef<RefAttributes<HTMLDivElement>, SigmaChartProps>(fu
                     labelFont: 'Roboto',
                     labelColor: { color: theme.contrast },
                     labelRenderer: drawLabel,
+                    // Legacy view: label selection when zoomed out is done by getDeclutteredLabels, not sigma's grid
+                    labelDensity: 0,
                     maxCameraRatio: MAX_CAMERA_RATIO,
                     minCameraRatio: MIN_CAMERA_RATIO,
                 }}>
