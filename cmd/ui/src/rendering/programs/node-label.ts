@@ -16,6 +16,7 @@
 
 import { truncateText } from 'bh-shared-ui';
 import { Settings } from 'sigma/settings';
+import { SHOW_NODE_SUBLABELS } from '../legacyView';
 import {
     EDGE_MIDDLE_ALIGN_OFFSET,
     EDGE_TYPES,
@@ -33,8 +34,11 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
     if (!data.label || !settings.labelColor.color) return;
 
     const inverseSqrtZoomRatio = data.inverseSqrtZoomRatio || 1;
+    // Legacy view: font size and opacity use a floored scale so labels stay readable when zoomed out;
+    // label placement still uses the true zoom so labels stay attached to their node.
+    const labelScale = data.labelScale ?? inverseSqrtZoomRatio;
 
-    const size = settings.labelSize * inverseSqrtZoomRatio,
+    const size = settings.labelSize * labelScale,
         font = settings.labelFont,
         weight = settings.labelWeight;
 
@@ -42,7 +46,7 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
     const fillText = data.highlighted ? data.highlightedText : settings.labelColor.color;
 
     const dimFactor = data.isDimmed ? data.labelDimFactor ?? 0.1 : 1;
-    context.globalAlpha = calculateLabelOpacity(inverseSqrtZoomRatio) * dimFactor;
+    context.globalAlpha = calculateLabelOpacity(labelScale) * dimFactor;
 
     // Edge labels: use original right-of-node positioning with center-alignment offset
     if (EDGE_TYPES.includes(data.type ?? '')) {
@@ -64,7 +68,7 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
         context.fillRect(...labelbounds);
 
         // Draw text with zoom/dim factor applied
-        context.globalAlpha = calculateLabelOpacity(inverseSqrtZoomRatio) * dimFactor;
+        context.globalAlpha = calculateLabelOpacity(labelScale) * dimFactor;
         context.fillStyle = fillText;
         context.fillText(data.label, labelbounds[0] + LABEL_PADDING, labelbounds[1] + labelbounds[3] - LABEL_PADDING);
 
@@ -99,7 +103,7 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
     context.fillStyle = fillBackground;
     context.fillRect(...primaryBounds);
 
-    context.globalAlpha = calculateLabelOpacity(inverseSqrtZoomRatio) * dimFactor;
+    context.globalAlpha = calculateLabelOpacity(labelScale) * dimFactor;
     context.fillStyle = fillText;
     context.fillText(
         primaryLabel,
@@ -107,7 +111,8 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
         primaryBounds[1] + primaryBounds[3] - LABEL_PADDING
     );
 
-    if (data.source && data.kind) {
+    // Legacy view: single-line labels; the "source | kind" sublabel is off (see SHOW_NODE_SUBLABELS)
+    if (SHOW_NODE_SUBLABELS && data.source && data.kind) {
         const nodeSource = labelTextRendered(data.source);
         const nodeKind = labelTextRendered(data.kind);
         const sublabelText = `${nodeSource} | ${nodeKind}`;
@@ -127,7 +132,7 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
         context.fillStyle = fillBackground;
         context.fillRect(...sublabelBounds);
 
-        context.globalAlpha = calculateLabelOpacity(inverseSqrtZoomRatio) * dimFactor;
+        context.globalAlpha = calculateLabelOpacity(labelScale) * dimFactor;
         context.fillStyle = fillText;
         context.fillText(
             sublabelText,

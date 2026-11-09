@@ -82,7 +82,9 @@ export const copySigmaNodesToGraphlibGraph = (
     graphlibGraph: any
 ): void => {
     sigmaGraph.forEachNode((node: string) => {
-        const { label, size } = sigmaGraph.getNodeAttributes(node);
+        const { label, size, hidden } = sigmaGraph.getNodeAttributes(node);
+        // Hidden nodes (e.g. folded into a collapsed group) take no space in the layout
+        if (hidden) return;
         graphlibGraph.setNode(node, {
             label: label || '',
             width: size || NODE_DEFAULT_SIZE,
@@ -98,6 +100,7 @@ export const copySigmaEdgesToGraphlibGraph = (
     sigmaGraph.forEachEdge((edge: string) => {
         const source = sigmaGraph.source(edge);
         const target = sigmaGraph.target(edge);
+        if (sigmaGraph.getNodeAttribute(source, 'hidden') || sigmaGraph.getNodeAttribute(target, 'hidden')) return;
         const { label } = sigmaGraph.getEdgeAttributes(edge);
         graphlibGraph.setEdge(source, target, { label: label || '', points: [] });
     });

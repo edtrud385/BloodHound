@@ -30,6 +30,7 @@ import { MultiDirectedGraph } from 'graphology';
 import { random } from 'graphology-layout';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import { GraphData, GraphEdge, GraphEdges, GraphNode, GraphNodes } from 'js-client-library';
+import { collapseLeaves, markLayoutChanged, stretchToAspect, syncHiddenPositions } from 'src/rendering/legacyView';
 import { Glyph, GlyphLocation } from 'src/rendering/programs/node.glyphs';
 import { RankDirection, setDagreLayout } from 'src/rendering/utils/dagre';
 import { EdgeDirection, EdgeParams, NodeParams, ThemedOptions } from 'src/utils';
@@ -42,20 +43,31 @@ export const standardLayout = (graph: MultiDirectedGraph) => {
             barnesHutOptimize: true,
         },
     });
+    syncHiddenPositions(graph);
+    markLayoutChanged(graph);
 };
 
-export const sequentialLayout = (graph: MultiDirectedGraph) => {
+const SEQUENTIAL_RANK_SEPARATION = 500;
+
+const defaultAspect = () =>
+    typeof window !== 'undefined' && window.innerHeight ? window.innerWidth / window.innerHeight : 1.6;
+
+export const sequentialLayout = (graph: MultiDirectedGraph, aspect: number = defaultAspect()) => {
     const { assign: assignDagre } = setDagreLayout(
         {
             graph: {
                 rankdir: RankDirection.LEFT_RIGHT,
-                ranksep: 500,
+                ranksep: SEQUENTIAL_RANK_SEPARATION,
             },
         },
         graph
     );
 
     assignDagre();
+    // Legacy view: stretch the layout to the screen's shape so ranks spread across the full width
+    stretchToAspect(graph, aspect);
+    syncHiddenPositions(graph);
+    markLayoutChanged(graph);
 };
 
 type GraphOptions = {
@@ -66,6 +78,8 @@ type GraphOptions = {
     tagGlyphs: TagGlyphs;
     pzFeatureFlagEnabled: boolean | undefined;
     themedOptions?: ThemedOptions;
+    /** Fold leaf nodes into group nodes (Legacy-style node collapse). */
+    collapseLeafNodes?: boolean;
 };
 
 export const initGraph = (items: GraphData, options: GraphOptions) => {
@@ -93,6 +107,8 @@ export const initGraph = (items: GraphData, options: GraphOptions) => {
     initGraphEdges(graph, edges, { ...options, themedOptions });
 
     random.assign(graph, { scale: 1000 });
+
+    if (options.collapseLeafNodes && !options.hideNodes) collapseLeaves(graph);
 
     // RUN DEFAULT LAYOUT
     sequentialLayout(graph);

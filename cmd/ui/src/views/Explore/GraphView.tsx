@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { faLayerGroup } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     BaseExploreLayoutOptions,
     ContextMenuPrivilegeZonesEnabled,
@@ -46,6 +48,7 @@ import {
     useTheme,
     useToggle,
 } from 'bh-shared-ui';
+import { IconButton, Tooltip } from 'doodle-ui';
 import { MultiDirectedGraph } from 'graphology';
 import { Attributes } from 'graphology-types';
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -61,6 +64,7 @@ import {
     setSelectedExploreTableColumns,
 } from 'src/ducks/global/actions';
 import { useSigmaExploreGraph } from 'src/hooks/useSigmaExploreGraph';
+import { expandGroup, findGroupContaining, isGroupEdge, isGroupItem, isGroupNode } from 'src/rendering/legacyView';
 import { useAppDispatch, useAppSelector } from 'src/store';
 import { initGraph } from 'src/views/Explore/utils';
 import ContextMenu from './ContextMenu/ContextMenu';
@@ -115,6 +119,8 @@ const GraphView: FC = () => {
 
     const [showNodeLabels, toggleShowNodeLabels] = useToggle(true);
     const [showEdgeLabels, toggleShowEdgeLabels] = useToggle(true);
+    // Legacy view: fold leaf nodes into group nodes (on by default, like Legacy's node collapse)
+    const [collapseLeafNodes, toggleCollapseLeafNodes] = useToggle(true);
 
     const isWebGLEnabledMemo = useMemo(() => isWebGLEnabled(), []);
 
@@ -126,8 +132,9 @@ const GraphView: FC = () => {
             hideNodes: displayTable,
             tagGlyphs,
             pzFeatureFlagEnabled: pzFeatureFlag?.enabled,
+            collapseLeafNodes,
         };
-    }, [theme, darkMode, customIconsQuery.data, displayTable, tagGlyphs, pzFeatureFlag?.enabled]);
+    }, [theme, darkMode, customIconsQuery.data, displayTable, tagGlyphs, pzFeatureFlag?.enabled, collapseLeafNodes]);
 
     // Initialize graph data for rendering with sigmajs
     useEffect(() => {
@@ -143,9 +150,35 @@ const GraphView: FC = () => {
         }
     }, [graphQuery.data, graphOptions]);
 
+    /* Legacy view: expand a collapsed group in place and re-run the current layout */
+    const expandGroupNode = useCallback(
+        (groupId: string) => {
+            if (!graphologyGraph || !expandGroup(graphologyGraph, groupId).length) return;
+            if (exploreLayout === 'standard') sigmaChartRef.current?.runStandardLayout();
+            else sigmaChartRef.current?.runSequentialLayout();
+        },
+        [graphologyGraph, exploreLayout]
+    );
+
+    const handleClickNode = useCallback(
+        (id: string) => (isGroupNode(id) ? expandGroupNode(id) : setSelectedItem(id)),
+        [expandGroupNode, setSelectedItem]
+    );
+
+    // Synthetic group edges have no backing relationship to show in the info panel
+    const handleClickEdge = useCallback((id: string) => !isGroupEdge(id) && setSelectedItem(id), [setSelectedItem]);
+
+    // If the selected node is folded into a group (e.g. picked from search), unfold it so it is visible
+    useEffect(() => {
+        if (!graphologyGraph || !selectedItem || !graphologyGraph.hasNode(selectedItem)) return;
+        const groupId = findGroupContaining(graphologyGraph, selectedItem);
+        if (groupId) expandGroupNode(groupId);
+    }, [graphologyGraph, selectedItem, expandGroupNode]);
+
     /* useCallback Event Handlers must appear before return statement */
     const handleContextMenu = useCallback(
         (event: SigmaNodeEventPayload) => {
+            if (isGroupItem(event.node)) return;
             setSelectedItem(event.node);
             setContextMenu(contextMenu === null ? { mouseX: event.event.x, mouseY: event.event.y } : null);
         },
@@ -291,8 +324,8 @@ const GraphView: FC = () => {
             <SigmaChart
                 graph={graphologyGraph}
                 highlightedItem={selectedItem}
-                onClickEdge={setSelectedItem}
-                onClickNode={setSelectedItem}
+                onClickEdge={handleClickEdge}
+                onClickNode={handleClickNode}
                 onClickStage={clearSelectedItem}
                 handleContextMenu={handleContextMenu}
                 showNodeLabels={showNodeLabels}
@@ -302,24 +335,43 @@ const GraphView: FC = () => {
 
             <div className='absolute top-0 h-full p-4 flex gap-2 justify-between flex-col pointer-events-none'>
                 <ExploreSearch />
-                <GraphControls
-                    isExploreTableSelected={isExploreTableSelected}
-                    isExploreLayoutSelected={isExploreLayoutSelected}
-                    layoutOptions={baseGraphLayouts}
-                    selectedLayout={exploreLayout ?? defaultGraphLayout}
-                    onLayoutChange={setLayout}
-                    showNodeLabels={showNodeLabels}
-                    onToggleNodeLabels={toggleShowNodeLabels}
-                    showEdgeLabels={showEdgeLabels}
-                    onToggleEdgeLabels={toggleShowEdgeLabels}
-                    jsonData={graphQuery.data}
-                    onReset={() => sigmaChartRef.current?.resetCamera()}
-                    currentNodes={graphQuery.data?.nodes}
-                    onSearchedNodeClick={(node) => {
-                        node.id && setSelectedItem(node.id);
-                        sigmaChartRef?.current?.zoomTo(node.id);
-                    }}
-                />
+                <div className='flex gap-1 items-end'>
+                    <GraphControls
+                        isExploreTableSelected={isExploreTableSelected}
+                        isExploreLayoutSelected={isExploreLayoutSelected}
+                        layoutOptions={baseGraphLayouts}
+                        selectedLayout={exploreLayout ?? defaultGraphLayout}
+                        onLayoutChange={setLayout}
+                        showNodeLabels={showNodeLabels}
+                        onToggleNodeLabels={toggleShowNodeLabels}
+                        showEdgeLabels={showEdgeLabels}
+                        onToggleEdgeLabels={toggleShowEdgeLabels}
+                        jsonData={graphQuery.data}
+                        onReset={() => sigmaChartRef.current?.resetCamera()}
+                        currentNodes={graphQuery.data?.nodes}
+                        onSearchedNodeClick={(node) => {
+                            node.id && setSelectedItem(node.id);
+                            sigmaChartRef?.current?.zoomTo(node.id);
+                        }}
+                    />
+                    <Tooltip
+                        tooltip={collapseLeafNodes ? 'Expand Grouped Nodes' : 'Group Leaf Nodes'}
+                        triggerProps={{ className: 'pointer-events-auto' }}
+                        contentProps={{ className: 'dark:bg-neutral-4 dark:border-neutral-5 dark:text-white' }}>
+                        <div>
+                            <IconButton
+                                aria-label={collapseLeafNodes ? 'Expand Grouped Nodes' : 'Group Leaf Nodes'}
+                                aria-pressed={collapseLeafNodes}
+                                onClick={toggleCollapseLeafNodes}
+                                className={
+                                    collapseLeafNodes ? '!bg-primary !text-white dark:!text-neutral-1' : undefined
+                                }
+                                data-testid='explore_graph-controls_collapse-leaves-toggle'>
+                                <FontAwesomeIcon aria-hidden='true' icon={faLayerGroup} />
+                            </IconButton>
+                        </div>
+                    </Tooltip>
+                </div>
             </div>
             <GraphItemInformationPanel />
             <FeatureFlag

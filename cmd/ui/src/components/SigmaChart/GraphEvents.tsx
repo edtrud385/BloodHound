@@ -30,6 +30,7 @@ import {
     graphToFramedGraph,
     resetCamera,
 } from 'src/ducks/graph/utils';
+import { LABEL_DECLUTTER_RATIO, getDeclutteredLabels, getLabelScale, getNodeSizeBoost } from 'src/rendering/legacyView';
 import { bezier } from 'src/rendering/utils/bezier';
 import { blendHexColors, getNodeRadius } from 'src/rendering/utils/utils';
 import { useAppSelector } from 'src/store';
@@ -101,6 +102,9 @@ export const GraphEvents = forwardRef(function GraphEvents(
     const sigma = useSigma();
     const graph = sigma.getGraph();
 
+    // Dev-only handle for inspecting the renderer from the browser console
+    if (import.meta.env.DEV) (window as any).__bhSigma = sigma;
+
     const registerEvents = useRegisterEvents();
     const setSettings = useSetSettings();
 
@@ -135,7 +139,8 @@ export const GraphEvents = forwardRef(function GraphEvents(
             },
 
             runSequentialLayout: () => {
-                sequentialLayout(graph);
+                const { width, height } = sigma.getDimensions();
+                sequentialLayout(graph, height ? width / height : undefined);
                 resetCamera(sigma);
             },
             runStandardLayout: () => {
@@ -307,11 +312,21 @@ export const GraphEvents = forwardRef(function GraphEvents(
                     !highlightedNodeIds.has(node) &&
                     isHighlightedItemInGraph;
 
+                const inverseSqrtZoomRatio = 1 / Math.sqrt(camera.ratio);
+
                 return {
                     ...data,
+                    // Legacy view: keep a minimum on-screen node size and a readable label size when zoomed out
+                    size: (data.size ?? 0) * getNodeSizeBoost(camera.ratio),
+                    labelScale: getLabelScale(inverseSqrtZoomRatio),
+                    forceLabel:
+                        data.forceLabel &&
+                        (camera.ratio <= LABEL_DECLUTTER_RATIO ||
+                            node === highlightedItem ||
+                            getDeclutteredLabels(graph, camera.ratio).has(node)),
                     highlighted: node === highlightedItem,
                     isExploreGraphLabelClip,
-                    inverseSqrtZoomRatio: 1 / Math.sqrt(camera.ratio),
+                    inverseSqrtZoomRatio,
                     isDimmed,
                     // Always pass the canvas background color so the shader can dim toward it.
                     graphBgColor: bgColor,
@@ -333,7 +348,9 @@ export const GraphEvents = forwardRef(function GraphEvents(
 
                 const newData: Attributes = {
                     ...data,
-                    hidden: false,
+                    // Hide edges whose endpoint is folded into a collapsed group (some custom edge programs
+                    // ignore sigma's hidden-extremity check)
+                    hidden: graph.extremities(edge).some((node) => graph.getNodeAttribute(node, 'hidden')),
                     highlighted: edge === highlightedItem,
                     inverseSqrtZoomRatio: 1 / Math.sqrt(camera.ratio),
                     isDimmed,
@@ -356,6 +373,7 @@ export const GraphEvents = forwardRef(function GraphEvents(
     }, [
         curvedEdgeReducer,
         darkMode,
+        graph,
         highlightedEdgeIds,
         highlightedItem,
         highlightedNodeIds,
