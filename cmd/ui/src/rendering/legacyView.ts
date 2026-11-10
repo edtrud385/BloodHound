@@ -74,6 +74,22 @@ export const NODE_LABEL_WEIGHT = 'normal';
 export const EDGE_TAPER_START = 1.6;
 export const EDGE_TAPER_END = 0.45;
 
+/** On-screen gap between the labels of parallel edges, in label heights. */
+export const PARALLEL_LABEL_SPACING = 1.3;
+
+/**
+ * Factor for CE's curve heights so that parallel edges between the same two nodes bow at least one label
+ * line apart on screen at the current zoom, letting each label sit on its own curve. CE's offsets
+ * (multiples of `groupSpread` in framed-graph units) shrink to nothing on Legacy's wide layouts.
+ */
+export const parallelCurveScale = (sigma: Sigma, labelPx: number, groupSpread: number): number => {
+    const a = sigma.viewportToFramedGraph({ x: 0, y: 0 });
+    const b = sigma.viewportToFramedGraph({ x: 0, y: 100 });
+    const framedPerPx = Math.hypot(b.x - a.x, b.y - a.y) / 100;
+    // Neighbouring curves' midpoints are groupSpread / 2 apart (a quadratic bows half its control offset)
+    return Math.max(1, (2 * labelPx * PARALLEL_LABEL_SPACING * framedPerPx) / groupSpread);
+};
+
 /** Edge width multiplier at `t` along the edge (0 = source, 1 = target). */
 export const edgeTaper = (t: number): number => EDGE_TAPER_START + (EDGE_TAPER_END - EDGE_TAPER_START) * t;
 

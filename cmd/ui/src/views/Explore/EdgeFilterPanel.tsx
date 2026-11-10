@@ -103,8 +103,8 @@ const EdgeFilterPanel: FC<EdgeFilterPanelProps> = ({ anchorEl, onClose, graph })
             open={!!anchorEl}
             anchorEl={anchorEl}
             onClose={onClose}
-            anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
-            transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
             slotProps={{ paper: { className: 'w-[360px] max-h-[75vh] flex flex-col' } }}
             data-testid='explore_edge-filter-panel'>
             <div className='p-3 pb-2'>
@@ -116,10 +116,13 @@ const EdgeFilterPanel: FC<EdgeFilterPanelProps> = ({ anchorEl, onClose, graph })
                 </div>
                 <div className='flex items-center gap-1 mt-2'>
                     <FormControl size='small' className='grow'>
-                        <InputLabel id='edge-filter-view-label'>View</InputLabel>
+                        <InputLabel id='edge-filter-view-label' shrink>
+                            View
+                        </InputLabel>
                         <Select
                             labelId='edge-filter-view-label'
                             label='View'
+                            notched
                             value={filter.viewName ?? ''}
                             onChange={(e) => e.target.value && applyEdgeFilterView(e.target.value)}
                             displayEmpty>

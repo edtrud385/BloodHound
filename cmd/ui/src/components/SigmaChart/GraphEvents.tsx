@@ -31,6 +31,7 @@ import type { SigmaNodeEventPayload } from 'sigma/sigma';
 import type { Coordinates } from 'sigma/types';
 import {
     DRAG_THRESHOLD,
+    GROUP_SPREAD,
     MOUSE_BUTTON_PRIMARY,
     getDistanceBetween,
     getEdgeDataFromKey,
@@ -47,6 +48,7 @@ import {
     getDeclutteredLabels,
     getLabelScale,
     getNodeSizeBoost,
+    parallelCurveScale,
 } from 'src/rendering/legacyView';
 import { bezier } from 'src/rendering/utils/bezier';
 import { blendHexColors, getNodeRadius } from 'src/rendering/utils/utils';
@@ -219,14 +221,20 @@ export const GraphEvents = forwardRef(function GraphEvents(
         (edge: string, data: Attributes, newData: Attributes) => {
             // We calculate control points for all curved edges here and pass those along as edge attributes in both viewport and framed graph
             // coordinates. We can then use those control points in our edge, edge label, and edge arrow programs.
-            const edgeData = getEdgeDataFromKey(edge);
+            // Edge keys are `rel_<id>`; the source_kind_target key lives in exploreGraphId (upstream parsed the key)
+            const edgeData = getEdgeDataFromKey(data.exploreGraphId ?? edge);
             if (edgeData !== null) {
                 const nodeDisplayData = getEdgeSourceAndTargetDisplayData(edgeData.source, edgeData.target, sigma);
                 if (nodeDisplayData !== null) {
                     const sourceCoordinates = { x: nodeDisplayData.source.x, y: nodeDisplayData.source.y };
                     const targetCoordinates = { x: nodeDisplayData.target.x, y: nodeDisplayData.target.y };
 
-                    const height = calculateCurveHeight(data.groupSize, data.groupPosition, data.direction);
+                    // Legacy view: spread parallel curves so each label fits on its own curve
+                    const labelPx =
+                        sigma.getSettings().edgeLabelSize * getLabelScale(newData.inverseSqrtZoomRatio ?? 1);
+                    const height =
+                        calculateCurveHeight(data.groupSize, data.groupPosition, data.direction) *
+                        parallelCurveScale(sigma, labelPx, GROUP_SPREAD);
                     const control = getControlAtMidpoint(height, sourceCoordinates, targetCoordinates);
 
                     newData.control = control;
@@ -239,7 +247,7 @@ export const GraphEvents = forwardRef(function GraphEvents(
 
     const selfEdgeReducer = useCallback(
         (edge: string, newData: Attributes) => {
-            const edgeData = getEdgeDataFromKey(edge);
+            const edgeData = getEdgeDataFromKey(newData.exploreGraphId ?? edge);
             if (edgeData !== null) {
                 const nodeDisplayData = getEdgeSourceAndTargetDisplayData(edgeData.source, edgeData.target, sigma);
                 if (nodeDisplayData !== null) {

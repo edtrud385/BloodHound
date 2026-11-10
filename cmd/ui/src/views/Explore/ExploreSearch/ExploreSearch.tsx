@@ -14,7 +14,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { faChevronDown, faChevronUp, faCode, faDirections, faSearch } from '@fortawesome/free-solid-svg-icons';
+import {
+    faChevronDown,
+    faChevronUp,
+    faCode,
+    faDirections,
+    faFilter,
+    faSearch,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Tab, Tabs } from '@mui/material';
 import {
@@ -28,6 +35,7 @@ import {
     encodeCypherQuery,
     isGraphResponse,
     useCypherSearch,
+    useEdgeFilter,
     useExploreParams,
     useExploreSelectedItem,
     useNodeSearch,
@@ -66,7 +74,12 @@ const getTab = (exploreSearchTab: ExploreQueryParams['exploreSearchTab']) => {
     return 'node';
 };
 
-const ExploreSearch: React.FC = () => {
+type ExploreSearchProps = {
+    /** Opens the Legacy-style edge filter, anchored to the filter button at the end of the tab bar. */
+    onOpenEdgeFilter?: (anchor: HTMLElement) => void;
+};
+
+const ExploreSearch: React.FC<ExploreSearchProps> = ({ onOpenEdgeFilter }) => {
     /* Hooks */
     const { cypherSearch, exploreSearchTab, setExploreParams } = useExploreParams();
     const { clearSelectedItem, setSelectedItem } = useExploreSelectedItem();
@@ -83,6 +96,10 @@ const ExploreSearch: React.FC = () => {
     const activeTabLabel = tabs[activeTabValue].label;
 
     const [showSearchWidget, setShowSearchWidget] = useState(true);
+    const edgeFilter = useEdgeFilter();
+    const edgeFilterLabel = edgeFilter.hiddenKinds.length
+        ? `Edge Filter (${edgeFilter.hiddenKinds.length} hidden${edgeFilter.applyToQueries ? ', applied to queries' : ''})`
+        : 'Edge Filter';
 
     /* Event Handlers */
     const handleTabChange = (newTabIndex: number) => {
@@ -225,6 +242,19 @@ const ExploreSearch: React.FC = () => {
                         />
                     ))}
                 </Tabs>
+                {onOpenEdgeFilter && (
+                    <IconButton
+                        aria-label={edgeFilterLabel}
+                        title={edgeFilterLabel}
+                        aria-pressed={edgeFilter.hiddenKinds.length > 0}
+                        data-testid='explore_search-container_header_edge-filter'
+                        className={cn('rounded-sm mr-1', {
+                            '!bg-primary !text-white dark:!text-neutral-1': edgeFilter.hiddenKinds.length > 0,
+                        })}
+                        onClick={(event) => onOpenEdgeFilter(event.currentTarget)}>
+                        <FontAwesomeIcon icon={faFilter} />
+                    </IconButton>
+                )}
             </div>
 
             <div
