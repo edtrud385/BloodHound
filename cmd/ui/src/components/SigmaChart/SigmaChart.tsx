@@ -37,6 +37,7 @@ interface SigmaChartProps {
     graph?: MultiDirectedGraph<Attributes, Attributes, Attributes>;
     highlightedItem: string | null;
     onClickNode: (id: string) => void;
+    onDoubleClickNode?: (id: string) => void;
     onClickEdge: (id: string) => void;
     onClickStage: () => void;
     handleContextMenu: (event: SigmaNodeEventPayload) => void;
@@ -49,6 +50,7 @@ const SigmaChart = forwardRef<RefAttributes<HTMLDivElement>, SigmaChartProps>(fu
         graph,
         highlightedItem,
         onClickNode,
+        onDoubleClickNode,
         onClickEdge,
         onClickStage,
         handleContextMenu,
@@ -104,6 +106,7 @@ const SigmaChart = forwardRef<RefAttributes<HTMLDivElement>, SigmaChartProps>(fu
                 <GraphEvents
                     highlightedItem={highlightedItem ?? null}
                     onClickNode={onClickNode}
+                    onDoubleClickNode={onDoubleClickNode}
                     onClickStage={onClickStage}
                     onRightClickNode={handleContextMenu}
                     showNodeLabels={showNodeLabels}

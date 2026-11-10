@@ -17,7 +17,7 @@
 import AbstractGraph, { Attributes } from 'graphology-types';
 import Sigma from 'sigma';
 import { Coordinates, Extent, NodeDisplayData } from 'sigma/types';
-import { visibleExtent } from 'src/rendering/legacyView';
+import { setFitRatio, visibleExtent } from 'src/rendering/legacyView';
 
 export const GROUP_SPREAD = 0.06;
 export const MIN_CAMERA_RATIO = 0.5;
@@ -191,6 +191,8 @@ const centerCameraOnGraph = (sigma: Sigma<AbstractGraph<Attributes, Attributes, 
     let ratio = Math.max(graphWidth / usableWidth, graphHeight / usableHeight, 1);
     if (ratio < MIN_CAMERA_RATIO) ratio = MIN_CAMERA_RATIO;
     if (ratio > MAX_CAMERA_RATIO) ratio = MAX_CAMERA_RATIO;
+    // Node and label size floors are relative to this fitted view, so they grow as you zoom in from it
+    setFitRatio(ratio);
 
     camera.animate(
         { ...camera.getState(), x: 0.5, y: 0.5, ratio },

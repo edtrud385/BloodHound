@@ -21,27 +21,36 @@
  * graph is laid out and drawn, never what the API returns. It is kept in one
  * file so the fork's diff against upstream CE stays small and easy to rebase.
  *
- *  - Leaf collapse: leaf nodes that hang off the same parent through the same
- *    relationship(s) fold into one group node ("412 User"), like Legacy's node
- *    collapse. Clicking a group node expands it.
+ *  - Leaf collapse: when a node has at least COLLAPSE_THRESHOLD leaf neighbours, the leaves
+ *    are hidden and the node shows a count bubble, like Legacy's node collapse.
+ *    Double-clicking the node expands them again.
  *  - Screen-shaped layout: the left-to-right layout is stretched to the screen's aspect ratio.
- *  - Minimum node size: nodes stop shrinking once zoomed out past a floor.
- *  - Readable labels: a floored font size, single-line labels, and decluttering when zoomed out.
+ *  - Node and label sizes: a readable floor at the fitted (zoomed-out) view, growing as you
+ *    zoom in like Legacy, with a user label-size multiplier.
+ *  - Readable labels: single-line, no background boxes, decluttered only where they would pile up.
  */
 
 import { MultiDirectedGraph } from 'graphology';
 import { Attributes } from 'graphology-types';
+import Sigma from 'sigma';
 import { Extent } from 'sigma/types';
 
 /** A parent needs at least this many matching leaves before they are folded (Legacy's default threshold is 5). */
 export const COLLAPSE_THRESHOLD = 5;
 
-/** Camera ratio past which node size is held constant on screen (higher = nodes may shrink further first). */
+/**
+ * Node size floor: at the fitted (fully zoomed-out) view nodes are drawn as if the camera ratio were
+ * this value, so they never shrink to dots. From there they grow smoothly as you zoom in and reach
+ * CE's normal size at 1:1 zoom.
+ */
 export const NODE_SIZE_FLOOR_RATIO = 3;
+
+/** Floored labels grow from LABEL_MIN_SCALE at the fitted view to this scale at 1:1 zoom (12px * 1.25 = 15px). */
+const LABEL_SCALE_AT_ONE = 1.25;
 
 /**
  * Past this camera ratio labels are no longer forced on every node; getDeclutteredLabels picks
- * the ones that fit (group nodes, then most-connected first) so the zoomed-out view stays
+ * the ones that fit (collapsed parents, then most-connected first) so the zoomed-out view stays
  * legible. The selected node always keeps its label.
  */
 export const LABEL_DECLUTTER_RATIO = 2;
@@ -58,124 +67,130 @@ export const EDGE_LABEL_ALONG_EDGE = true;
 /** Labels never render smaller than this fraction of their full-size font (12px * 0.85 ≈ 10px). */
 export const LABEL_MIN_SCALE = 0.85;
 
-export const GROUP_NODE_PREFIX = 'collapsed-group:';
-const GROUP_EDGE_PREFIX = 'collapsed-edge:';
+/** Range and step for the user's label-size multiplier (node and edge labels). */
+export const LABEL_SIZE_MIN = 0.6;
+export const LABEL_SIZE_MAX = 2.5;
+export const LABEL_SIZE_STEP = 1.15;
+const LABEL_SIZE_STORAGE_KEY = 'bh-legacy-view-label-size';
 
-export const isGroupNode = (id: string | null | undefined): boolean => !!id && id.startsWith(GROUP_NODE_PREFIX);
-export const isGroupEdge = (id: string | null | undefined): boolean => !!id && id.startsWith(GROUP_EDGE_PREFIX);
-export const isGroupItem = (id: string | null | undefined): boolean => isGroupNode(id) || isGroupEdge(id);
+const readStoredLabelSize = (): number => {
+    try {
+        const stored = Number(window.localStorage.getItem(LABEL_SIZE_STORAGE_KEY));
+        return Number.isFinite(stored) && stored > 0 ? stored : 1;
+    } catch {
+        return 1;
+    }
+};
 
-/** Multiplier applied to node size so nodes keep a minimum on-screen size when zoomed out. */
-export const getNodeSizeBoost = (cameraRatio: number): number => Math.max(1, cameraRatio / NODE_SIZE_FLOOR_RATIO);
+let labelSizeMultiplier = typeof window !== 'undefined' ? readStoredLabelSize() : 1;
 
-/** Label scale (font size and opacity) with a readable floor. */
-export const getLabelScale = (inverseSqrtZoomRatio: number): number => Math.max(inverseSqrtZoomRatio, LABEL_MIN_SCALE);
+/** Current label-size multiplier (1 = default). */
+export const getLabelSizeMultiplier = (): number => labelSizeMultiplier;
 
-type LeafEdge = { key: string; outbound: boolean; label: string };
+/** Set the label-size multiplier (clamped) and remember it in this browser. Returns the applied value. */
+export const setLabelSizeMultiplier = (value: number): number => {
+    labelSizeMultiplier = Math.min(LABEL_SIZE_MAX, Math.max(LABEL_SIZE_MIN, value));
+    try {
+        window.localStorage.setItem(LABEL_SIZE_STORAGE_KEY, String(labelSizeMultiplier));
+    } catch {
+        // storage unavailable (private window): the setting just won't persist
+    }
+    return labelSizeMultiplier;
+};
 
-const pluralize = (kind: string, count: number) => (count === 1 ? kind : `${kind}s`);
+/** Camera ratio of the last "fit whole graph" view; sizes are floored relative to it. */
+let fitRatio = 1;
+export const setFitRatio = (ratio: number): void => {
+    if (Number.isFinite(ratio) && ratio > 0) fitRatio = ratio;
+};
 
 /**
- * Fold leaf nodes into group nodes. Leaves are hidden (not removed) so the
- * group can be expanded again without refetching. Tier Zero / owned nodes only
- * fold with nodes carrying the same glyphs, and the group keeps those glyphs.
+ * Smooth growth curve for a size floor: `floor` at the fitted ratio, `atOne` at ratio 1, following a
+ * power law in between (and beyond, so it keeps growing), never below `floor` when zoomed out further.
+ */
+const flooredScale = (cameraRatio: number, floor: number, atOne: number): number => {
+    if (fitRatio <= 1 || atOne <= floor) return floor;
+    const exponent = Math.log(atOne / floor) / Math.log(fitRatio);
+    return Math.max(floor, floor * Math.pow(fitRatio / cameraRatio, exponent));
+};
+
+/**
+ * Multiplier applied to node size. CE draws nodes at size / ratio, so they shrink to dots when
+ * zoomed out. Here nodes keep the NODE_SIZE_FLOOR_RATIO size at the fitted view and grow smoothly as
+ * you zoom in (Legacy-like), meeting CE's natural size at 1:1 zoom.
+ */
+export const getNodeSizeBoost = (cameraRatio: number): number => {
+    // On-screen size relative to CE's size at ratio 1
+    const floorFactor =
+        fitRatio > NODE_SIZE_FLOOR_RATIO
+            ? flooredScale(cameraRatio, 1 / NODE_SIZE_FLOOR_RATIO, 1)
+            : 1 / NODE_SIZE_FLOOR_RATIO;
+    return Math.max(1, cameraRatio * floorFactor);
+};
+
+/**
+ * Label scale (font size; opacity uses it too). LABEL_MIN_SCALE at the fitted view, growing smoothly
+ * as you zoom in (Legacy-like), never smaller than CE's own size, times the user's label-size setting.
+ */
+export const getLabelScale = (inverseSqrtZoomRatio: number): number => {
+    const cameraRatio = 1 / (inverseSqrtZoomRatio * inverseSqrtZoomRatio);
+    const floor = flooredScale(cameraRatio, LABEL_MIN_SCALE, LABEL_SCALE_AT_ONE);
+    return Math.max(inverseSqrtZoomRatio, floor) * labelSizeMultiplier;
+};
+
+/** Number of leaves currently folded into `node` (0 when none). */
+export const getCollapsedCount = (attrs: Attributes): number =>
+    (attrs.collapsedMembers as string[] | undefined)?.length ?? 0;
+
+/**
+ * Legacy-style node collapse: when a node has at least `threshold` leaf neighbours (nodes whose only
+ * neighbour is that node), hide the leaves and record them on the node, which then shows a count
+ * bubble. Leaves are hidden, not removed, so they can be expanded again without refetching.
  */
 export const collapseLeaves = (graph: MultiDirectedGraph, threshold = COLLAPSE_THRESHOLD): void => {
-    const groups = new Map<string, { parent: string; kind: string; edges: LeafEdge[]; members: string[] }>();
+    const leavesByParent = new Map<string, string[]>();
 
     graph.forEachNode((node, attrs) => {
-        if (attrs.hidden || isGroupNode(node)) return;
+        if (attrs.hidden) return;
 
         const neighbors = graph.neighbors(node);
         if (neighbors.length !== 1) return;
 
         const parent = neighbors[0];
-        // Two leaves pointing at each other would both look like leaves; keep pairs intact.
+        // Two nodes connected only to each other would both look like leaves; keep pairs intact.
         if (graph.neighbors(parent).length === 1) return;
 
-        const edges: LeafEdge[] = graph.edges(node).map((key) => ({
-            key,
-            outbound: graph.source(key) === node,
-            label: graph.getEdgeAttribute(key, 'label') ?? '',
-        }));
-        const signature = edges
-            .map((e) => `${e.outbound ? '>' : '<'}${e.label}`)
-            .sort()
-            .join('|');
-        const kind = attrs.kind ?? '';
-        // Nodes with glyphs (Tier Zero / owned) only fold with nodes that carry the same glyphs
-        const glyphKey = ((attrs.glyphs as { image?: string }[] | undefined) ?? []).map((g) => g.image).join(',');
-        const groupKey = `${parent}\u0000${kind}\u0000${glyphKey}\u0000${signature}`;
-
-        const group = groups.get(groupKey);
-        if (group) group.members.push(node);
-        else groups.set(groupKey, { parent, kind, edges, members: [node] });
+        const leaves = leavesByParent.get(parent);
+        if (leaves) leaves.push(node);
+        else leavesByParent.set(parent, [node]);
     });
 
-    let counter = 0;
-    groups.forEach(({ parent, kind, edges, members }) => {
-        if (members.length < threshold) return;
-
-        const groupId = `${GROUP_NODE_PREFIX}${counter++}`;
-        const sample = graph.getNodeAttributes(members[0]);
-
-        graph.addNode(groupId, {
-            ...sample,
-            label: `${members.length} ${pluralize(kind || 'Node', members.length)}`,
-            size: (sample.size ?? 25) * 1.2,
-            hidden: false,
-            collapsedMembers: members,
-            collapsedParent: parent,
-        });
-
-        const seen = new Set<string>();
-        edges.forEach(({ key, outbound, label }) => {
-            const id = `${outbound ? '>' : '<'}${label}`;
-            if (seen.has(id)) return;
-            seen.add(id);
-
-            const edgeAttrs = graph.getEdgeAttributes(key);
-            const [source, target] = outbound ? [groupId, parent] : [parent, groupId];
-            graph.addEdgeWithKey(`${GROUP_EDGE_PREFIX}${groupId}:${id}`, source, target, {
-                ...edgeAttrs,
-                type: 'arrow',
-                groupPosition: 0,
-                groupSize: 1,
-                exploreGraphId: `${GROUP_EDGE_PREFIX}${groupId}:${id}`,
-            });
-        });
-
-        members.forEach((member) => graph.setNodeAttribute(member, 'hidden', true));
+    leavesByParent.forEach((leaves, parent) => {
+        if (leaves.length < threshold) return;
+        leaves.forEach((leaf) => graph.setNodeAttribute(leaf, 'hidden', true));
+        graph.setNodeAttribute(parent, 'collapsedMembers', leaves);
     });
 
     syncHiddenPositions(graph);
 };
 
-/** Expand a group node back into its members. Returns the ids that were revealed. */
-export const expandGroup = (graph: MultiDirectedGraph, groupId: string): string[] => {
-    if (!graph.hasNode(groupId)) return [];
-    if (graph.getNodeAttribute(groupId, 'expanded')) return [];
-    const members: string[] = graph.getNodeAttribute(groupId, 'collapsedMembers') ?? [];
+/** Expand the leaves folded into `node`. Returns the ids that were revealed. */
+export const expandCollapsed = (graph: MultiDirectedGraph, node: string): string[] => {
+    if (!graph.hasNode(node)) return [];
+    const members: string[] = graph.getNodeAttribute(node, 'collapsedMembers') ?? [];
     members.forEach((member) => graph.hasNode(member) && graph.setNodeAttribute(member, 'hidden', false));
-    // Hide rather than drop: the group is usually the hovered node when clicked, and sigma 2
-    // dereferences its hovered node on the next mouse move, which crashes if the node is gone.
-    graph.mergeNodeAttributes(groupId, { hidden: true, expanded: true });
+    graph.removeNodeAttribute(node, 'collapsedMembers');
     return members;
 };
 
-/** Find the group node that currently hides `nodeId`, if any. */
-export const findGroupContaining = (graph: MultiDirectedGraph, nodeId: string): string | undefined =>
-    graph.findNode(
-        (node, attrs) =>
-            isGroupNode(node) &&
-            !attrs.expanded &&
-            ((attrs.collapsedMembers as string[] | undefined) ?? []).includes(nodeId)
-    );
+/** Find the node whose count bubble currently hides `nodeId`, if any. */
+export const findCollapsedParent = (graph: MultiDirectedGraph, nodeId: string): string | undefined =>
+    graph.findNode((_node, attrs) => ((attrs.collapsedMembers as string[] | undefined) ?? []).includes(nodeId));
 
-/** Park hidden members on their group node so they don't distort extents or later layouts. */
+/** Park folded leaves on their parent so they don't distort extents or later layouts. */
 export const syncHiddenPositions = (graph: MultiDirectedGraph): void => {
-    graph.forEachNode((node, attrs) => {
-        if (!isGroupNode(node) || attrs.expanded) return;
+    graph.forEachNode((_node, attrs) => {
+        if (!getCollapsedCount(attrs)) return;
         (attrs.collapsedMembers as string[]).forEach((member) => {
             if (!graph.hasNode(member)) return;
             graph.setNodeAttribute(member, 'x', attrs.x);
@@ -247,7 +262,7 @@ export const markLayoutChanged = (graph: MultiDirectedGraph): void => {
 
 /**
  * Pick which nodes get a label at the given zoom: at most one per screen cell, preferring
- * group nodes and then the most connected nodes (the chokepoints you want to read first).
+ * collapsed parents and then the most connected nodes (the chokepoints you want to read first).
  * Cached per zoom step and layout, so the node reducer can call it for every node.
  */
 export const getDeclutteredLabels = (
@@ -266,7 +281,10 @@ export const getDeclutteredLabels = (
 
     const candidates = graph
         .filterNodes((_node, attrs) => !attrs.hidden && !!attrs.label)
-        .map((node) => ({ node, priority: (isGroupNode(node) ? 1e9 : 0) + graph.degree(node) }))
+        .map((node) => ({
+            node,
+            priority: (getCollapsedCount(graph.getNodeAttributes(node)) ? 1e9 : 0) + graph.degree(node),
+        }))
         .sort((a, b) => b.priority - a.priority);
 
     const taken = new Set<string>();
@@ -281,4 +299,56 @@ export const getDeclutteredLabels = (
 
     declutterCache.set(graph, { key, labels });
     return labels;
+};
+
+const formatCount = (count: number): string => (count >= 10000 ? `${Math.round(count / 1000)}k` : String(count));
+
+/**
+ * Draw Legacy's count bubble (black circle, white number, bottom-left of the node) on every visible
+ * node that has collapsed leaves. Runs after each sigma render, on the labels canvas, so it shows
+ * even when that node's label is hidden or labels are switched off.
+ */
+export const drawCollapsedBadges = (sigma: Sigma): void => {
+    const canvas = sigma.getCanvases().labels;
+    const context = canvas?.getContext('2d');
+    if (!context) return;
+
+    const graph = sigma.getGraph();
+    const ratio = sigma.getCamera().ratio;
+    const font = sigma.getSetting('labelFont') ?? 'Roboto';
+
+    graph.forEachNode((node, attrs) => {
+        const count = getCollapsedCount(attrs);
+        if (!count) return;
+
+        const display = sigma.getNodeDisplayData(node) as (Attributes & { x: number; y: number }) | undefined;
+        if (!display || display.hidden) return;
+
+        const { x, y } = sigma.framedGraphToViewport(display);
+        // On-screen node radius: node programs draw at size / camera ratio
+        const nodeRadius = (display.size ?? 0) / ratio;
+        const text = formatCount(count);
+        const fontSize = Math.max(9, nodeRadius * 0.55);
+
+        context.save();
+        context.font = `bold ${fontSize}px ${font}`;
+        const badgeRadius = Math.max(fontSize * 0.8, context.measureText(text).width / 2 + 3);
+        const cx = x - nodeRadius * 0.75;
+        const cy = y + nodeRadius * 0.75;
+
+        context.globalAlpha = display.isDimmed ? display.dimFactor ?? 0.3 : 1;
+        context.beginPath();
+        context.arc(cx, cy, badgeRadius, 0, Math.PI * 2);
+        context.fillStyle = '#000000';
+        context.fill();
+        context.lineWidth = 1;
+        context.strokeStyle = '#ffffff';
+        context.stroke();
+
+        context.fillStyle = '#ffffff';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(text, cx, cy + 0.5);
+        context.restore();
+    });
 };

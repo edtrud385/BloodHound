@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { faLayerGroup } from '@fortawesome/free-solid-svg-icons';
+import { faLayerGroup, faRoute } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     BaseExploreLayoutOptions,
@@ -51,25 +51,61 @@ import {
 import { IconButton, Tooltip } from 'doodle-ui';
 import { MultiDirectedGraph } from 'graphology';
 import { Attributes } from 'graphology-types';
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { SigmaNodeEventPayload } from 'sigma/sigma';
 import { NoDataFileUploadDialogWithLinks } from 'src/components/NoDataFileUploadDialogWithLinks';
 import SigmaChart from 'src/components/SigmaChart';
 import {
     setExploreLayout,
+    setIsExploreGraphHighlight,
     setIsExploreLayoutSelected,
     setIsExploreTableSelected,
     setPinnedExploreTableColumns,
     setSelectedExploreTableColumns,
 } from 'src/ducks/global/actions';
 import { useSigmaExploreGraph } from 'src/hooks/useSigmaExploreGraph';
-import { expandGroup, findGroupContaining, isGroupEdge, isGroupItem, isGroupNode } from 'src/rendering/legacyView';
+import {
+    LABEL_SIZE_MAX,
+    LABEL_SIZE_MIN,
+    LABEL_SIZE_STEP,
+    expandCollapsed,
+    findCollapsedParent,
+    getLabelSizeMultiplier,
+    setLabelSizeMultiplier,
+} from 'src/rendering/legacyView';
 import { useAppDispatch, useAppSelector } from 'src/store';
 import { initGraph } from 'src/views/Explore/utils';
 import ContextMenu from './ContextMenu/ContextMenu';
 import ExploreSearch from './ExploreSearch/ExploreSearch';
 import { transformIconDictionary } from './svgIcons';
+
+/** Legacy view: one icon button in the graph controls row, styled like CE's own controls */
+const LegacyControlButton: FC<{
+    label: string;
+    onClick: () => void;
+    pressed?: boolean;
+    disabled?: boolean;
+    testId: string;
+    children: ReactNode;
+}> = ({ label, onClick, pressed, disabled, testId, children }) => (
+    <Tooltip
+        tooltip={label}
+        triggerProps={{ className: 'pointer-events-auto' }}
+        contentProps={{ className: 'dark:bg-neutral-4 dark:border-neutral-5 dark:text-white' }}>
+        <div>
+            <IconButton
+                aria-label={label}
+                aria-pressed={pressed}
+                disabled={disabled}
+                onClick={onClick}
+                className={pressed ? '!bg-primary !text-white dark:!text-neutral-1' : undefined}
+                data-testid={testId}>
+                {children}
+            </IconButton>
+        </div>
+    </Tooltip>
+);
 
 const GraphView: FC = () => {
     /* Hooks */
@@ -150,35 +186,40 @@ const GraphView: FC = () => {
         }
     }, [graphQuery.data, graphOptions]);
 
-    /* Legacy view: expand a collapsed group in place and re-run the current layout */
-    const expandGroupNode = useCallback(
-        (groupId: string) => {
-            if (!graphologyGraph || !expandGroup(graphologyGraph, groupId).length) return;
+    /* Legacy view: expand the leaves folded into a node (count bubble) and re-run the current layout */
+    const expandCollapsedNode = useCallback(
+        (node: string) => {
+            if (!graphologyGraph || !expandCollapsed(graphologyGraph, node).length) return;
             if (exploreLayout === 'standard') sigmaChartRef.current?.runStandardLayout();
             else sigmaChartRef.current?.runSequentialLayout();
         },
         [graphologyGraph, exploreLayout]
     );
 
-    const handleClickNode = useCallback(
-        (id: string) => (isGroupNode(id) ? expandGroupNode(id) : setSelectedItem(id)),
-        [expandGroupNode, setSelectedItem]
-    );
-
-    // Synthetic group edges have no backing relationship to show in the info panel
-    const handleClickEdge = useCallback((id: string) => !isGroupEdge(id) && setSelectedItem(id), [setSelectedItem]);
-
-    // If the selected node is folded into a group (e.g. picked from search), unfold it so it is visible
+    // If the selected node is folded into a count bubble (e.g. picked from search), unfold it so it is visible
     useEffect(() => {
         if (!graphologyGraph || !selectedItem || !graphologyGraph.hasNode(selectedItem)) return;
-        const groupId = findGroupContaining(graphologyGraph, selectedItem);
-        if (groupId) expandGroupNode(groupId);
-    }, [graphologyGraph, selectedItem, expandGroupNode]);
+        const parent = findCollapsedParent(graphologyGraph, selectedItem);
+        if (parent) expandCollapsedNode(parent);
+    }, [graphologyGraph, selectedItem, expandCollapsedNode]);
+
+    /* Legacy view: label size control (node and edge labels), remembered in this browser */
+    const [labelSize, setLabelSize] = useState(getLabelSizeMultiplier);
+    const changeLabelSize = useCallback((factor: number) => {
+        setLabelSize(setLabelSizeMultiplier(getLabelSizeMultiplier() * factor));
+        sigmaChartRef.current?.refresh();
+    }, []);
+
+    /* CE's path highlight: selecting a node dims everything not on a path through it */
+    const isExploreGraphHighlight = useAppSelector((state) => state.global.view.isExploreGraphHighlight);
+    const togglePathHighlight = useCallback(
+        () => dispatch(setIsExploreGraphHighlight(isExploreGraphHighlight === false)),
+        [dispatch, isExploreGraphHighlight]
+    );
 
     /* useCallback Event Handlers must appear before return statement */
     const handleContextMenu = useCallback(
         (event: SigmaNodeEventPayload) => {
-            if (isGroupItem(event.node)) return;
             setSelectedItem(event.node);
             setContextMenu(contextMenu === null ? { mouseX: event.event.x, mouseY: event.event.y } : null);
         },
@@ -324,8 +365,9 @@ const GraphView: FC = () => {
             <SigmaChart
                 graph={graphologyGraph}
                 highlightedItem={selectedItem}
-                onClickEdge={handleClickEdge}
-                onClickNode={handleClickNode}
+                onClickEdge={setSelectedItem}
+                onClickNode={setSelectedItem}
+                onDoubleClickNode={expandCollapsedNode}
                 onClickStage={clearSelectedItem}
                 handleContextMenu={handleContextMenu}
                 showNodeLabels={showNodeLabels}
@@ -354,23 +396,38 @@ const GraphView: FC = () => {
                             sigmaChartRef?.current?.zoomTo(node.id);
                         }}
                     />
-                    <Tooltip
-                        tooltip={collapseLeafNodes ? 'Expand Grouped Nodes' : 'Group Leaf Nodes'}
-                        triggerProps={{ className: 'pointer-events-auto' }}
-                        contentProps={{ className: 'dark:bg-neutral-4 dark:border-neutral-5 dark:text-white' }}>
-                        <div>
-                            <IconButton
-                                aria-label={collapseLeafNodes ? 'Expand Grouped Nodes' : 'Group Leaf Nodes'}
-                                aria-pressed={collapseLeafNodes}
-                                onClick={toggleCollapseLeafNodes}
-                                className={
-                                    collapseLeafNodes ? '!bg-primary !text-white dark:!text-neutral-1' : undefined
-                                }
-                                data-testid='explore_graph-controls_collapse-leaves-toggle'>
-                                <FontAwesomeIcon aria-hidden='true' icon={faLayerGroup} />
-                            </IconButton>
-                        </div>
-                    </Tooltip>
+                    <LegacyControlButton
+                        label={collapseLeafNodes ? 'Expand Collapsed Nodes' : 'Collapse Leaf Nodes'}
+                        pressed={collapseLeafNodes}
+                        onClick={toggleCollapseLeafNodes}
+                        testId='explore_graph-controls_collapse-leaves-toggle'>
+                        <FontAwesomeIcon aria-hidden='true' icon={faLayerGroup} />
+                    </LegacyControlButton>
+                    <LegacyControlButton
+                        label={`${isExploreGraphHighlight !== false ? 'Disable' : 'Enable'} Path Highlight on Select`}
+                        pressed={isExploreGraphHighlight !== false}
+                        onClick={togglePathHighlight}
+                        testId='explore_graph-controls_path-highlight-toggle'>
+                        <FontAwesomeIcon aria-hidden='true' icon={faRoute} />
+                    </LegacyControlButton>
+                    <LegacyControlButton
+                        label='Smaller Labels'
+                        disabled={labelSize <= LABEL_SIZE_MIN}
+                        onClick={() => changeLabelSize(1 / LABEL_SIZE_STEP)}
+                        testId='explore_graph-controls_label-smaller'>
+                        <span aria-hidden='true' className='text-xs font-bold'>
+                            A−
+                        </span>
+                    </LegacyControlButton>
+                    <LegacyControlButton
+                        label='Bigger Labels'
+                        disabled={labelSize >= LABEL_SIZE_MAX}
+                        onClick={() => changeLabelSize(LABEL_SIZE_STEP)}
+                        testId='explore_graph-controls_label-bigger'>
+                        <span aria-hidden='true' className='text-base font-bold'>
+                            A+
+                        </span>
+                    </LegacyControlButton>
                 </div>
             </div>
             <GraphItemInformationPanel />

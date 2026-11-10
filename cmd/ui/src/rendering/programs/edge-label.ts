@@ -26,7 +26,7 @@ import { Settings } from 'sigma/settings';
 import { Coordinates, NodeDisplayData, PartialButFor } from 'sigma/types';
 import { EdgeDistanceProperties, calculateEdgeDistanceForLabel } from 'src/ducks/graph/utils';
 import { bezier } from 'src/rendering/utils/bezier';
-import { EDGE_LABEL_ALONG_EDGE, LABEL_MIN_SCALE } from '../legacyView';
+import { EDGE_LABEL_ALONG_EDGE, getLabelScale } from '../legacyView';
 import { GraphItemData, calculateLabelOpacity } from '../utils/utils';
 import { getControlPointsFromGroupSize } from './edge.self';
 import drawLabel from './node-label';
@@ -139,8 +139,8 @@ const drawLabelAlongEdge = (
     settings: Settings
 ): void => {
     const inverseSqrtZoomRatio = edgeData.inverseSqrtZoomRatio || 1;
-    // Same readable floor as node labels: never smaller than LABEL_MIN_SCALE, never faded out
-    const labelScale = Math.max(inverseSqrtZoomRatio, LABEL_MIN_SCALE);
+    // Same sizing as node labels: readable floor, grows on zoom-in, follows the label-size setting
+    const labelScale = getLabelScale(inverseSqrtZoomRatio);
     const opacity = calculateLabelOpacity(labelScale);
     if (opacity <= 0) return;
 
