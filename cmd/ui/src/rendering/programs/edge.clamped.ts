@@ -16,11 +16,11 @@
 
 import { AbstractEdgeProgram } from 'sigma/rendering/webgl/programs/common/edge';
 import { RenderParams } from 'sigma/rendering/webgl/programs/common/program';
-import vertexShaderSource from 'sigma/rendering/webgl/shaders/edge.clamped.vert.glsl';
 import fragmentShaderSource from 'sigma/rendering/webgl/shaders/edge.frag.glsl';
 import { EdgeDisplayData, NodeDisplayData } from 'sigma/types';
 import { canUse32BitsIndices, floatColor } from 'sigma/utils';
 import { edgeTaper } from 'src/rendering/legacyView';
+import { vertexShaderSource } from 'src/rendering/shaders/edge.clamped.vert';
 import { getNodeRadius } from 'src/rendering/utils/utils';
 
 const POINTS = 4,

@@ -44,6 +44,7 @@ import {
     LABEL_DECLUTTER_RATIO,
     NODE_ICON_SCALE,
     ViewBounds,
+    describeCollapsed,
     drawCollapsedBadges,
     getDeclutteredLabels,
     getLabelScale,
@@ -267,11 +268,18 @@ export const GraphEvents = forwardRef(function GraphEvents(
 
     useEffect(() => {
         registerEvents({
-            enterNode: () => {
-                if (sigmaContainer) sigmaContainer.style.cursor = 'grab';
+            enterNode: (event) => {
+                if (sigmaContainer) {
+                    sigmaContainer.style.cursor = 'grab';
+                    // Legacy view: explain what a count bubble stands for
+                    sigmaContainer.title = describeCollapsed(graph, event.node);
+                }
             },
             leaveNode: () => {
-                if (sigmaContainer) sigmaContainer.style.cursor = 'default';
+                if (sigmaContainer) {
+                    sigmaContainer.style.cursor = 'default';
+                    sigmaContainer.title = '';
+                }
             },
             downNode: (event) => {
                 if (event.event.original.button === MOUSE_BUTTON_PRIMARY) {
