@@ -48,7 +48,8 @@ the UI falls back to a source/kind/target key for them.
 
 The filter button at the right end of the Search / Pathfinding / Cypher tab bar opens a Legacy-style **Edge Filter**. It lists only the edge
 types in the current graph, with counts, grouped like CE's pathfinding filter. Unticking a type hides
-those edges at once; **Hide nodes left without edges** also hides nodes that only had hidden edges.
+those edges at once; **Hide nodes left without edges** also hides nodes that only had hidden edges. Unticked types
+move to a **Hidden** group at the top, even once they are no longer in the graph, so they can be ticked back.
 **Apply filter to every query** goes further, like Legacy: the unticked types are removed from every
 multi-type edge list in the Cypher query (`-[:A|B|C*1..]->`) and the query re-runs, so paths around them
 show up. Single-type patterns such as `-[:HasSession]->` are left as written. On the Cypher tab, **Recalculate** does
