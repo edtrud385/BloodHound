@@ -28,6 +28,16 @@ This UI expects a CE 9.x server. Against CE 8.x the node panel and the right-cli
 because 8.x has no `/api/v2/nodes/{id}` endpoint. Graphs still draw: 8.x sends edges without ids, and
 the UI falls back to a source/kind/target key for them.
 
+## Edge filter
+
+The filter button next to the graph controls opens a Legacy-style **Edge Filter**. It lists only the edge
+types in the current graph, with counts, grouped like CE's pathfinding filter. Unticking a type hides
+those edges at once; **Hide nodes left without edges** also hides nodes that only had hidden edges.
+**Apply filter to every query** goes further, like Legacy: the unticked types are removed from every
+multi-type edge list in the Cypher query (`-[:A|B|C*1..]->`) and the query re-runs, so paths around them
+show up. Single-type patterns such as `-[:HasSession]->` are left as written. The current ticks can be
+saved as named **views**. The filter and views are kept in your browser.
+
 ## Large queries (server config, no code change)
 
 CE has no row cap on Cypher results. Large queries are cut off by three server limits, all

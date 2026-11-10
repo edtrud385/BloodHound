@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useRegisterEvents, useSetSettings, useSigma } from '@react-sigma/core';
-import { useTheme } from 'bh-shared-ui';
+import { useEdgeFilter, useTheme } from 'bh-shared-ui';
 import type { Attributes } from 'graphology-types';
 import {
     forwardRef,
@@ -354,6 +354,21 @@ export const GraphEvents = forwardRef(function GraphEvents(
         };
     }, [graph]);
 
+    // Legacy-style edge filter (display): hide edges of unticked kinds, and optionally the nodes they leave alone
+    const edgeFilter = useEdgeFilter();
+    const hiddenEdgeKinds = useMemo(() => new Set(edgeFilter.hiddenKinds), [edgeFilter.hiddenKinds]);
+    const filteredOutNodes = useMemo(() => {
+        const out = new Set<string>();
+        if (!edgeFilter.hideOrphans || hiddenEdgeKinds.size === 0) return out;
+        graph.forEachNode((node) => {
+            if (graph.degree(node) === 0) return; // nodes that never had an edge stay
+            const keepsAnEdge = graph.someEdge(node, (_edge, attrs) => !hiddenEdgeKinds.has(attrs.label));
+            if (!keepsAnEdge) out.add(node);
+        });
+        return out;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [graph, hiddenEdgeKinds, edgeFilter.hideOrphans, layoutVersion]);
+
     const isHighlightedItemInGraph = useMemo(
         () => getIsHighlightedItemInGraph(graph, highlightedItem),
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -387,6 +402,7 @@ export const GraphEvents = forwardRef(function GraphEvents(
 
                 return {
                     ...data,
+                    hidden: data.hidden || filteredOutNodes.has(node),
                     // Legacy view: keep a minimum on-screen node size and a readable label size when zoomed out
                     size: (data.size ?? 0) * getNodeSizeBoost(camera.ratio) * NODE_ICON_SCALE,
                     labelScale: getLabelScale(inverseSqrtZoomRatio),
@@ -421,7 +437,11 @@ export const GraphEvents = forwardRef(function GraphEvents(
                     ...data,
                     // Hide edges whose endpoint is folded into a collapsed group (some custom edge programs
                     // ignore sigma's hidden-extremity check)
-                    hidden: graph.extremities(edge).some((node) => graph.getNodeAttribute(node, 'hidden')),
+                    hidden:
+                        hiddenEdgeKinds.has(data.label) ||
+                        graph
+                            .extremities(edge)
+                            .some((node) => graph.getNodeAttribute(node, 'hidden') || filteredOutNodes.has(node)),
                     highlighted: edge === highlightedItem,
                     inverseSqrtZoomRatio: 1 / Math.sqrt(camera.ratio),
                     isDimmed,
@@ -444,7 +464,9 @@ export const GraphEvents = forwardRef(function GraphEvents(
     }, [
         curvedEdgeReducer,
         darkMode,
+        filteredOutNodes,
         graph,
+        hiddenEdgeKinds,
         highlightedEdgeIds,
         highlightedItem,
         highlightedNodeIds,

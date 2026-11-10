@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import isEmpty from 'lodash/isEmpty';
-import { apiClient } from '../../../utils';
+import { apiClient, applyEdgeFilterToQuery } from '../../../utils';
 import { ExploreQueryParams } from '../../useExploreParams';
 import { UserSettings } from '../useExploreGraph';
 import { decodeCypherQuery } from '../utils';
@@ -31,7 +31,9 @@ const CYPHER_SEARCH_EMPTY_RESPONSE_ERROR = 'CypherSearchEmptyResponse';
 
 export const cypherSearchGraphQuery = (
     paramOptions: Partial<ExploreQueryParams>,
-    userSettings: UserSettings
+    userSettings: UserSettings,
+    /** Edge kinds to strip from the query's edge-type lists (Legacy's "Apply filter to every query"). */
+    queryHiddenEdgeKinds: string[] = []
 ): ExploreGraphQueryOptions => {
     const { searchType, cypherSearch } = paramOptions;
 
@@ -39,9 +41,15 @@ export const cypherSearchGraphQuery = (
         return { enabled: false };
     }
 
-    const decoded = decodeCypherQuery(cypherSearch);
+    const decoded = applyEdgeFilterToQuery(decodeCypherQuery(cypherSearch), queryHiddenEdgeKinds);
 
-    const queryKey = [ExploreGraphQueryKey, searchType, cypherSearch, userSettings.headers?.Prefer];
+    const queryKey = [
+        ExploreGraphQueryKey,
+        searchType,
+        cypherSearch,
+        userSettings.headers?.Prefer,
+        queryHiddenEdgeKinds.join('|'),
+    ];
 
     const includeProperties = true;
 
@@ -89,10 +97,11 @@ const getCypherErrorMessage = (error: any): ExploreGraphQueryError => {
 
 export const cypherSearchQuery = (
     paramOptions: Partial<ExploreQueryParams>,
-    userSettings: UserSettings
+    userSettings: UserSettings,
+    queryHiddenEdgeKinds: string[] = []
 ): ExploreGraphQuery => {
     return {
-        getQueryConfig: () => cypherSearchGraphQuery(paramOptions, userSettings),
+        getQueryConfig: () => cypherSearchGraphQuery(paramOptions, userSettings, queryHiddenEdgeKinds),
         getErrorMessage: getCypherErrorMessage,
     };
 };

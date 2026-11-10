@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSigma } from '@react-sigma/core';
-import { useCreateDisableZoomRef } from 'bh-shared-ui';
+import { getEdgeFilterState, useCreateDisableZoomRef } from 'bh-shared-ui';
 import { FC, useCallback } from 'react';
 import {
     calculateEdgeDistanceForLabel,
@@ -55,6 +55,8 @@ export const GraphEdgeEvents: FC<GraphEdgeEventProps> = ({ onClickEdge }) => {
                 for (let i = 0; i < edges.length; i++) {
                     const edge: string = edges[i];
                     const attributes = graph.getEdgeAttributes(edge);
+                    // Edges hidden by the edge filter are not drawn, so their labels must not be clickable
+                    if (getEdgeFilterState().hiddenKinds.includes(attributes.label)) continue;
 
                     const edgeData = getEdgeDataFromKey(attributes.exploreGraphId);
                     if (edgeData === null) continue;

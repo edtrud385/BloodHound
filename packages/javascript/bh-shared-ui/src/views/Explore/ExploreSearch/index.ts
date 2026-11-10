@@ -15,6 +15,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export { default as CypherSearch } from './CypherSearch';
+export { BUILTIN_EDGE_CATEGORIES } from './EdgeFilter/edgeCategories';
+export type { Category as EdgeCategory } from './EdgeFilter/edgeCategories';
 export { default as GraphViewErrorAlert } from './GraphViewErrorAlert';
 export { default as NodeSearch } from './NodeSearch';
 export { default as PathfindingSearch } from './PathfindingSearch';
