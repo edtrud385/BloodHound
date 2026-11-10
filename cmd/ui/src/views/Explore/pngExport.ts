@@ -32,6 +32,28 @@ const SETTINGS_KEY = 'bh-png-export';
 const DEFAULT_SETTINGS: PngExportSettings = { prefix: 'bloodhound', autoNumber: true };
 const FALLBACK_COUNTER_KEY = 'bh-png-export-counter';
 
+/*
+ * Without a folder API (Firefox, Safari) the page cannot see the folder, so the number is remembered per file
+ * name instead: a new name starts again at 001, and the dialog lets the user set the next number.
+ */
+const counterKey = (prefix: string) => `${FALLBACK_COUNTER_KEY}:${prefix.toLowerCase()}`;
+
+export const getNextDownloadNumber = (prefix: string): number => {
+    try {
+        return Math.max(1, Number(localStorage.getItem(counterKey(cleanPrefix(prefix))) ?? 1) || 1);
+    } catch {
+        return 1;
+    }
+};
+
+export const setNextDownloadNumber = (prefix: string, n: number) => {
+    try {
+        localStorage.setItem(counterKey(cleanPrefix(prefix)), String(Math.max(1, Math.floor(n) || 1)));
+    } catch {
+        // Not remembered: numbering starts at 001 next time
+    }
+};
+
 export const canPickFolder = (): boolean => typeof (window as any).showDirectoryPicker === 'function';
 
 export const getPngExportSettings = (): PngExportSettings => {
@@ -132,7 +154,7 @@ const listNames = async (folder: DirectoryHandle): Promise<string[]> => {
 export const previewName = async (settings: PngExportSettings, folder?: DirectoryHandle): Promise<string> => {
     const prefix = cleanPrefix(settings.prefix);
     if (!settings.autoNumber) return `${prefix}.png`;
-    if (!folder) return numberedName(prefix, Number(localStorage.getItem(FALLBACK_COUNTER_KEY) ?? 0) + 1);
+    if (!folder) return numberedName(prefix, getNextDownloadNumber(prefix));
     try {
         if ((await folder.queryPermission?.({ mode: 'readwrite' })) !== 'granted') return numberedName(prefix, 1);
         return numberedName(prefix, nextNumber(await listNames(folder), prefix));
@@ -150,7 +172,7 @@ const download = (blob: Blob, name: string) => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
-export type SaveResult = { saved: false } | { saved: true; name: string; folder?: string };
+export type SaveResult = { saved: false } | { saved: true; name: string; folder?: string; downloaded?: boolean };
 
 /**
  * Save the PNG. Numbered: straight into the folder as the next free number. Not numbered: a Save As
@@ -162,12 +184,12 @@ export const savePng = async (blob: Blob, settings: PngExportSettings): Promise<
     if (!canPickFolder()) {
         let name = `${prefix}.png`;
         if (settings.autoNumber) {
-            const n = Number(localStorage.getItem(FALLBACK_COUNTER_KEY) ?? 0) + 1;
-            localStorage.setItem(FALLBACK_COUNTER_KEY, String(n));
+            const n = getNextDownloadNumber(prefix);
+            setNextDownloadNumber(prefix, n + 1);
             name = numberedName(prefix, n);
         }
         download(blob, name);
-        return { saved: true, name };
+        return { saved: true, name, downloaded: true };
     }
 
     const folder = (await getSavedFolder()) ?? (await pickFolder());

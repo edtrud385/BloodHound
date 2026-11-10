@@ -31,10 +31,12 @@ import {
     canPickFolder,
     canvasToPng,
     getPngExportSettings,
+    getNextDownloadNumber,
     getSavedFolder,
     pickFolder,
     previewName,
     savePng,
+    setNextDownloadNumber,
     setPngExportSettings,
 } from './pngExport';
 
@@ -54,7 +56,8 @@ export const usePngExport = (capture: () => HTMLCanvasElement | undefined) => {
                 const result = await savePng(await canvasToPng(canvas), settings);
                 if (result.saved) {
                     const where = result.folder ? ` to ${result.folder}` : '';
-                    addNotification(`Saved ${result.name}${where}`, 'PngExportSaved', { autoHideDuration: 3000 });
+                    const verb = result.downloaded ? 'Downloaded' : 'Saved';
+                    addNotification(`${verb} ${result.name}${where}`, 'PngExportSaved', { autoHideDuration: 3000 });
                 }
             } catch (error) {
                 console.error(error);
@@ -88,6 +91,7 @@ const PngExportDialog = ({ open, onClose, onSave }: PngExportDialogProps) => {
     const [settings, setSettings] = useState<PngExportSettings>(getPngExportSettings);
     const [folderName, setFolderName] = useState<string>();
     const [nextName, setNextName] = useState('');
+    const [nextNumber, setNextNumber] = useState(1);
     const folderSupported = canPickFolder();
 
     useEffect(() => {
@@ -95,6 +99,10 @@ const PngExportDialog = ({ open, onClose, onSave }: PngExportDialogProps) => {
         setSettings(getPngExportSettings());
         getSavedFolder().then((folder) => setFolderName(folder?.name));
     }, [open]);
+
+    useEffect(() => {
+        if (open) setNextNumber(getNextDownloadNumber(settings.prefix));
+    }, [open, settings.prefix]);
 
     useEffect(() => {
         if (!open) return;
@@ -105,7 +113,7 @@ const PngExportDialog = ({ open, onClose, onSave }: PngExportDialogProps) => {
         return () => {
             current = false;
         };
-    }, [open, settings, folderName]);
+    }, [open, settings, folderName, nextNumber]);
 
     const update = (change: Partial<PngExportSettings>) => {
         const next = { ...settings, ...change };
@@ -135,10 +143,16 @@ const PngExportDialog = ({ open, onClose, onSave }: PngExportDialogProps) => {
                         </Button>
                     </div>
                 ) : (
-                    <p className='text-sm'>
-                        This browser cannot save into a chosen folder, so the PNG goes to your Downloads folder. Use
-                        Chrome or Edge to pick a folder.
-                    </p>
+                    <div className='text-sm flex flex-col gap-2' data-testid='png-export-download-note'>
+                        <p>
+                            This browser does not let a web page pick a folder, so each PNG is saved as a download.
+                        </p>
+                        <p>
+                            To choose the folder in Firefox, turn on{' '}
+                            <b>Settings &gt; General &gt; Downloads &gt; Always ask you where to save files</b>. The Save box
+                            then opens in the folder you used last, with the numbered name filled in.
+                        </p>
+                    </div>
                 )}
                 <TextField
                     label='File name'
@@ -157,6 +171,20 @@ const PngExportDialog = ({ open, onClose, onSave }: PngExportDialogProps) => {
                     }
                     label='Number the files automatically'
                 />
+                {!folderSupported && settings.autoNumber && (
+                    <TextField
+                        label='Next number'
+                        size='small'
+                        type='number'
+                        value={nextNumber}
+                        onChange={(event) => {
+                            const n = Math.max(1, Number(event.target.value) || 1);
+                            setNextNumber(n);
+                            setNextDownloadNumber(settings.prefix, n);
+                        }}
+                        inputProps={{ min: 1, 'data-testid': 'png-export-next-number' }}
+                    />
+                )}
                 <div className='text-sm' data-testid='png-export-next-name'>
                     {settings.autoNumber ? (
                         <>
