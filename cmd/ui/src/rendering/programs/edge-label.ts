@@ -122,11 +122,9 @@ export default function draw(
         return;
     }
 
-    // Parallel edges between the same two nodes share one midpoint and each label gets its own text line
-    // (see drawLabelAlongEdge), so they don't pile up however flat the curves are drawn.
-    const isParallel = edgeData.type === 'curved' && (edgeData.groupSize ?? 1) > 1;
-    const point = isParallel ? { x: edgeDistance.cx, y: edgeDistance.cy } : startingPoint;
-    drawLabelAlongEdge(context, edgeData, sourceData, targetData, point, settings);
+    // Curved (parallel) edges put the label on their own curve's midpoint; GraphEvents spreads the
+    // curves so neighbouring labels don't overlap.
+    drawLabelAlongEdge(context, edgeData, sourceData, targetData, startingPoint, settings);
 }
 
 /**
@@ -180,9 +178,6 @@ const drawLabelAlongEdge = (
         : edgeData.labelColor ?? settings.edgeLabelColor.color ?? '#000';
     context.textAlign = 'center';
     context.textBaseline = 'bottom';
-    // Parallel edges: stack the labels as lines of text centred on the edge, in group order
-    const groupSize = edgeData.type === 'curved' ? edgeData.groupSize ?? 1 : 1;
-    const line = groupSize > 1 ? (edgeData.groupPosition ?? 0) - (groupSize - 2) / 2 : 0;
-    context.fillText(label, 0, -((edgeData.size ?? 1) / 2 + 1) * inverseSqrtZoomRatio + line * size * 1.15);
+    context.fillText(label, 0, -((edgeData.size ?? 1) / 2 + 1) * inverseSqrtZoomRatio);
     context.restore();
 };

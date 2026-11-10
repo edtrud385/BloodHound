@@ -16,6 +16,7 @@
 
 import { useSigma } from '@react-sigma/core';
 import { getEdgeFilterState, useCreateDisableZoomRef } from 'bh-shared-ui';
+import type { Attributes } from 'graphology-types';
 import { FC, useCallback } from 'react';
 import {
     calculateEdgeDistanceForLabel,
@@ -85,9 +86,12 @@ export const GraphEdgeEvents: FC<GraphEdgeEventProps> = ({ onClickEdge }) => {
                             attributes.groupPosition,
                             attributes.direction
                         );
-                        const control = sigma.framedGraphToViewport(
-                            bezier.getControlAtMidpoint(curveHeight, sourceCoordinates, targetCoordinates)
-                        );
+                        // Use the control point the edge reducer drew with (it spreads parallel curves for labels)
+                        const control =
+                            (sigma.getEdgeDisplayData(edge) as Attributes | undefined)?.controlInViewport ??
+                            sigma.framedGraphToViewport(
+                                bezier.getControlAtMidpoint(curveHeight, sourceCoordinates, targetCoordinates)
+                            );
 
                         point = bezier.getCoordinatesAlongQuadraticBezier(
                             sourceCoordinatesViewport,
