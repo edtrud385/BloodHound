@@ -44,6 +44,11 @@ This UI expects a CE 9.x server. Against CE 8.x the node panel and the right-cli
 because 8.x has no `/api/v2/nodes/{id}` endpoint. Graphs still draw: 8.x sends edges without ids, and
 the UI falls back to a source/kind/target key for them.
 
+## Back button
+
+The ← button just left of the filter icon steps back to the previous graph (a browser back: every search,
+pathfinding and Cypher query is in the URL, so going back reruns the one before).
+
 ## Edge filter
 
 The filter button at the right end of the Search / Pathfinding / Cypher tab bar opens a Legacy-style **Edge Filter**. It lists only the edge

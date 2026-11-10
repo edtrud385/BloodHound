@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+    faArrowLeft,
     faChevronDown,
     faChevronUp,
     faCode,
@@ -242,6 +243,14 @@ const ExploreSearch: React.FC<ExploreSearchProps> = ({ onOpenEdgeFilter }) => {
                         />
                     ))}
                 </Tabs>
+                <IconButton
+                    aria-label='Back to the previous graph'
+                    title='Back to the previous graph'
+                    data-testid='explore_search-container_header_back'
+                    className='rounded-sm ml-1'
+                    onClick={() => window.history.back()}>
+                    <FontAwesomeIcon icon={faArrowLeft} />
+                </IconButton>
                 {onOpenEdgeFilter && (
                     <IconButton
                         aria-label={edgeFilterLabel}
