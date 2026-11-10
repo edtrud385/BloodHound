@@ -44,6 +44,19 @@ This UI expects a CE 9.x server. Against CE 8.x the node panel and the right-cli
 because 8.x has no `/api/v2/nodes/{id}` endpoint. Graphs still draw: 8.x sends edges without ids, and
 the UI falls back to a source/kind/target key for them.
 
+## Reachable Tier Zero Targets
+
+Legacy's **Reachable High Value Targets** is back in the node panel, under Object Information and above Sessions.
+CE calls high value *Tier Zero* (the `Tag_Tier_Zero` label), so it is named **Reachable Tier Zero Targets**.
+
+- The count is every Tier Zero object the selected node reaches by a shortest path over traversable edges (CE's
+  pathfinding edge list for AD and Azure), including Tier Zero objects on the way.
+- Opening it draws those paths (as a Cypher query, so it shows on the Cypher tab and can be edited) and keeps the
+  node selected with the section open; the list underneath names each target, and clicking one searches for it.
+- The count is usually higher than Legacy's for the same data: CE tags far more objects Tier Zero than Legacy marked
+  high value (the GPOs, OUs, containers and certificate templates that control Tier Zero, not just the admin
+  groups, Domain and DCs).
+
 ## Save as PNG
 
 **Export > PNG** saves the graph exactly as it is on screen (at screen resolution, on the current light or dark

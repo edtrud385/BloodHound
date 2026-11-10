@@ -28,12 +28,20 @@ const getEntityKindInfoSections = (id: string, kind: string) => {
     return [];
 };
 
-const EntityInfoList: React.FC<EntityInfoContentProps> = ({ selectedNode, additionalTables, DataTable }) => {
+const EntityInfoList: React.FC<EntityInfoContentProps> = ({ selectedNode, additionalTables, leadingTables, DataTable }) => {
     const primaryKind = usePrimaryKind(selectedNode.kinds);
     const entityInfoKindSections = getEntityKindInfoSections(selectedNode.properties.objectid ?? '', primaryKind);
 
     return (
         <div data-testid='entity-info-data-table-list'>
+            {leadingTables?.map(({ sectionProps, TableComponent }, index) => (
+                <React.Fragment key={`leading-${index}`}>
+                    <Box padding={1}>
+                        <Divider />
+                    </Box>
+                    <TableComponent {...sectionProps} />
+                </React.Fragment>
+            ))}
             {entityInfoKindSections.map((table, index) => {
                 return (
                     <React.Fragment key={index}>

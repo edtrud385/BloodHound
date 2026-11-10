@@ -32,6 +32,7 @@ import {
     MappedStringLiteral,
     NodeSearch,
     PathfindingSearch,
+    REACHABLE_TIER_ZERO_LABEL,
     cn,
     encodeCypherQuery,
     isGraphResponse,
@@ -82,8 +83,8 @@ type ExploreSearchProps = {
 
 const ExploreSearch: React.FC<ExploreSearchProps> = ({ onOpenEdgeFilter }) => {
     /* Hooks */
-    const { cypherSearch, exploreSearchTab, setExploreParams } = useExploreParams();
-    const { clearSelectedItem, setSelectedItem } = useExploreSelectedItem();
+    const { cypherSearch, exploreSearchTab, expandedPanelSections, setExploreParams } = useExploreParams();
+    const { clearSelectedItem, setSelectedItem, selectedItem } = useExploreSelectedItem();
 
     const nodeSearchState = useNodeSearch();
     const pathfindingSearchState = usePathfindingSearch();
@@ -194,8 +195,14 @@ const ExploreSearch: React.FC<ExploreSearchProps> = ({ onOpenEdgeFilter }) => {
             const keepSearchMenuOpenBecauseNoCypherQuery = !cypherSearch && exploreSearchTab === 'cypher';
             const shouldCloseMenu = !keepSearchMenuOpenBecauseNoCypherQuery && returnedNodes.length >= 1;
 
+            // Reachable Tier Zero Targets draws its paths for the selected node: keep that node and its panel open
+            const keepSelection =
+                !!selectedItem &&
+                returnedNodes.includes(selectedItem) &&
+                ((expandedPanelSections ?? []) as string[]).includes(REACHABLE_TIER_ZERO_LABEL);
+
             if (returnedNodes.length > 1) {
-                clearSelectedItem();
+                if (!keepSelection) clearSelectedItem();
             } else if (returnedNodes.length === 1) {
                 setSelectedItem(returnedNodes[0]);
             }

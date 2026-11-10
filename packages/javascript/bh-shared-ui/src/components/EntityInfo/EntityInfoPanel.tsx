@@ -35,6 +35,8 @@ export interface EntityInfoPanelProps {
     className?: HTMLProps<HTMLDivElement>['className'];
     additionalTables?: EntityTables;
     priorityTables?: EntityTables;
+    /** Shown first in the relationship list, after Object Information. */
+    leadingTables?: EntityTables;
     showPlaceholderMessage?: boolean;
 }
 
@@ -43,6 +45,7 @@ const EntityInfoPanel: React.FC<EntityInfoPanelProps> = ({
     className,
     additionalTables,
     priorityTables,
+    leadingTables,
     DataTable,
     showPlaceholderMessage = false,
 }) => {
@@ -63,6 +66,7 @@ const EntityInfoPanel: React.FC<EntityInfoPanelProps> = ({
                     <EntityInfoContent
                         DataTable={DataTable}
                         priorityTables={priorityTables}
+                        leadingTables={leadingTables}
                         additionalTables={additionalTables}
                         selectedNode={selectedNode}
                     />
