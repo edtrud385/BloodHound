@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { cleanPrefix, nextNumber, numberedName } from './pngExport';
+import { cleanPrefix, getNextDownloadNumber, nextNumber, numberedName, setNextDownloadNumber } from './pngExport';
 
 describe('PNG export naming', () => {
     it('numbers one past the highest existing file for the prefix', () => {
@@ -36,5 +36,21 @@ describe('PNG export naming', () => {
     it('cleans names the file system would reject', () => {
         expect(cleanPrefix('paths/to:DA.png')).toBe('paths-to-DA');
         expect(cleanPrefix('   ')).toBe('bloodhound');
+    });
+});
+
+describe('download numbering (no folder API)', () => {
+    beforeEach(() => localStorage.clear());
+
+    it('keeps a separate next number per file name', () => {
+        expect(getNextDownloadNumber('bloodhound')).toBe(1);
+        setNextDownloadNumber('bloodhound', 12);
+        expect(getNextDownloadNumber('bloodhound')).toBe(12);
+        expect(getNextDownloadNumber('DA-paths')).toBe(1);
+    });
+
+    it('never goes below 1', () => {
+        setNextDownloadNumber('x', -3);
+        expect(getNextDownloadNumber('x')).toBe(1);
     });
 });

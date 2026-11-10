@@ -56,8 +56,13 @@ background). **Export > PNG options…** sets where and how:
   `bloodhound-001.png`, `bloodhound-002.png`, … (it looks at what is already in the folder, so it never
   overwrites). Off, a Save As dialog opens in that folder for each PNG.
 
-Picking a folder needs Chrome or Edge (File System Access API). Other browsers download to the Downloads folder
-with the same numbered name.
+Picking a folder needs Chrome or Edge (File System Access API). **Firefox and Safari** do not let a page choose
+or write into a folder, so there each PNG is a download with the numbered name:
+
+- Turn on Firefox **Settings > General > Downloads > Always ask you where to save files** to choose the folder:
+  the Save box opens in the folder used last, with the numbered name filled in.
+- The page cannot see that folder, so the number is remembered per file name (a new name starts at 001) and the
+  dialog has a **Next number** field to set or reset it.
 
 ## Back button
 
