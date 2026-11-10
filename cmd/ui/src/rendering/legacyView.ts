@@ -268,10 +268,10 @@ const EXPAND_MIN_OFFSET = 500;
 
 /**
  * Expand the leaves folded into `node` without touching the rest of the layout or the camera:
- * every other node stays where it is and the leaves are placed in one column beside their parent,
- * like a layout rank (left of it when they point at it, right of it when it points at them). Like
- * Legacy, the column is squeezed to fit the screen's height and set well out from the parent, so
- * the whole fan is visible at once; zoom in to separate overlapping names. The parent remembers
+ * every other node stays where it is. When other nodes are on screen, the leaves join the layout
+ * column of the parent's other one-hop neighbours (left when they point at it, right when it points
+ * at them; see placeInOneHopColumn). When the parent is alone, they fan out in one column squeezed to
+ * the screen's height, Legacy-style; zoom in to separate overlapping names. The parent remembers
  * the leaves so they can be folded back with `recollapse`. Returns the ids that were revealed.
  */
 export const expandInPlace = (graph: MultiDirectedGraph, node: string, view?: ViewBounds): string[] => {
@@ -296,6 +296,14 @@ export const expandInPlace = (graph: MultiDirectedGraph, node: string, view?: Vi
         py = (view.yMin + view.yMax) / 2;
         graph.setNodeAttribute(node, 'x', px);
         graph.setNodeAttribute(node, 'y', py);
+    }
+
+    const memberSet = new Set(members);
+    if (othersVisible) {
+        placeInOneHopColumn(graph, node, incoming, -1, memberSet);
+        placeInOneHopColumn(graph, node, outgoing, 1, memberSet);
+        markLayoutChanged(graph);
+        return members;
     }
 
     const place = (group: string[], side: -1 | 1) => {
@@ -335,6 +343,82 @@ export const expandInPlace = (graph: MultiDirectedGraph, node: string, view?: Vi
 
     markLayoutChanged(graph);
     return members;
+};
+
+const median = (values: number[]): number | undefined => {
+    if (!values.length) return undefined;
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+};
+
+/** Positive gaps between sorted values (e.g. between layout columns, or between nodes in a column). */
+const gapsBetween = (values: number[]): number[] => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted
+        .slice(1)
+        .map((v, i) => v - sorted[i])
+        .filter((gap) => gap > 1e-6);
+};
+
+/**
+ * Put expanded leaves where the layout would: in the column of the parent's other one-hop neighbours on
+ * that side (left for leaves pointing at the parent, right for leaves it points at), at that column's
+ * spacing, as a block after the column's existing nodes on the end nearer the parent. Nothing that is
+ * already drawn moves.
+ */
+const placeInOneHopColumn = (
+    graph: MultiDirectedGraph,
+    parent: string,
+    group: string[],
+    side: -1 | 1,
+    memberSet: Set<string>
+): void => {
+    if (!group.length) return;
+    const { x: px, y: py } = graph.getNodeAttributes(parent);
+    const visible = graph.filterNodes((n, attrs) => !attrs.hidden && !memberSet.has(n));
+    const xOf = (n: string) => graph.getNodeAttribute(n, 'x') as number;
+    const yOf = (n: string) => graph.getNodeAttribute(n, 'y') as number;
+
+    // Distance between layout columns (dagre ranks), and the usual gap between nodes within a column
+    const columnXs = [...new Set(visible.map((n) => Math.round(xOf(n))))];
+    const rankGap = median(gapsBetween(columnXs)) ?? EXPAND_MIN_OFFSET;
+    const tolerance = rankGap * 0.05;
+    const byColumn = new Map<number, number[]>();
+    visible.forEach((n) => {
+        const key = Math.round(xOf(n) / Math.max(tolerance, 1e-6));
+        byColumn.set(key, [...(byColumn.get(key) ?? []), yOf(n)]);
+    });
+    const typicalRowGap = median([...byColumn.values()].flatMap((ys) => gapsBetween(ys))) ?? EXPAND_MAX_ROW_SPACING;
+
+    // The one-hop column: where the parent's existing neighbours on this side are, else one rank over
+    const sideNeighbours = graph
+        .neighbors(parent)
+        .filter(
+            (n) =>
+                !memberSet.has(n) &&
+                !graph.getNodeAttribute(n, 'hidden') &&
+                (side === -1 ? graph.hasEdge(n, parent) : graph.hasEdge(parent, n))
+        );
+    const columnX = median(sideNeighbours.map(xOf)) ?? px + side * rankGap;
+    const columnYs = visible.filter((n) => Math.abs(xOf(n) - columnX) <= tolerance).map(yOf);
+    const spacing = median(gapsBetween(columnYs)) ?? typicalRowGap;
+
+    // A block after the column's nodes, on the end nearer the parent (or centred on it in an empty column)
+    const sorted = [...group].sort((a, b) =>
+        String(graph.getNodeAttribute(a, 'label') ?? '').localeCompare(String(graph.getNodeAttribute(b, 'label') ?? ''))
+    );
+    let top: number;
+    if (!columnYs.length) {
+        top = py - (spacing * (sorted.length - 1)) / 2;
+    } else {
+        const minY = Math.min(...columnYs);
+        const maxY = Math.max(...columnYs);
+        top = py >= (minY + maxY) / 2 ? maxY + spacing : minY - spacing * sorted.length;
+    }
+    sorted.forEach((member, i) => {
+        graph.setNodeAttribute(member, 'x', columnX);
+        graph.setNodeAttribute(member, 'y', top + i * spacing);
+    });
 };
 
 /** Fold leaves expanded with `expandInPlace` back into their parent's count bubble. */
