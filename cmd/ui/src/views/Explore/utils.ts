@@ -30,7 +30,13 @@ import { MultiDirectedGraph } from 'graphology';
 import { random } from 'graphology-layout';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import { GraphData, GraphEdge, GraphEdges, GraphNode, GraphNodes } from 'js-client-library';
-import { collapseLeaves, markLayoutChanged, stretchToAspect, syncHiddenPositions } from 'src/rendering/legacyView';
+import {
+    EDGE_BASE_SIZE,
+    collapseLeaves,
+    markLayoutChanged,
+    stretchToAspect,
+    syncHiddenPositions,
+} from 'src/rendering/legacyView';
 import { Glyph, GlyphLocation } from 'src/rendering/programs/node.glyphs';
 import { RankDirection, setDagreLayout } from 'src/rendering/utils/dagre';
 import { EdgeDirection, EdgeParams, NodeParams, ThemedOptions } from 'src/utils';
@@ -250,7 +256,7 @@ const initGraphEdges = (
 
             // Set default values for single edges
             const edgeParams: Partial<EdgeParams> = {
-                size: 4,
+                size: EDGE_BASE_SIZE,
                 color: options.darkMode ? '#6c6c6c' : '#55595C',
                 type: 'arrow',
                 label: edge.label,

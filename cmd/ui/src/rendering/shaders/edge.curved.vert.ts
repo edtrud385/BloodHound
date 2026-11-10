@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { TAPERED_THICKNESS_GLSL } from 'src/rendering/legacyView';
+
 export const vertexShaderSource = /* glsl */ `
 attribute vec4 a_color;
 attribute vec2 a_normal;
@@ -38,7 +40,8 @@ void main() {
 
   // These first computations are taken from edge.vert.glsl. Please read it to
   // get better comments on what's happening:
-  float pixelsThickness = max(normalLength, minThickness * u_sqrtZoomRatio);
+  // Legacy view: scale the whole edge so its narrow end meets the minimum, keeping the taper
+  float pixelsThickness = ${TAPERED_THICKNESS_GLSL};
   float webGLThickness = pixelsThickness * u_correctionRatio;
   float adaptedWebGLThickness = webGLThickness * u_sqrtZoomRatio;
 

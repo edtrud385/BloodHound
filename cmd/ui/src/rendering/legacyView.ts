@@ -90,6 +90,21 @@ export const parallelCurveScale = (sigma: Sigma, labelPx: number, groupSpread: n
     return Math.max(1, (2 * labelPx * PARALLEL_LABEL_SPACING * framedPerPx) / groupSpread);
 };
 
+/** Width CE gives every edge (views/Explore/utils.ts); the shaders scale tapered edges from it. */
+export const EDGE_BASE_SIZE = 4;
+
+/** Thinnest on-screen width (px) of a tapered edge's narrow end; the whole edge scales up to keep it. */
+export const EDGE_MIN_END_PX = 0.7;
+
+/**
+ * GLSL replacing sigma's per-vertex `max(normalLength, 1.7 * u_sqrtZoomRatio)` floor. Applied to each
+ * end separately, that floor flattens a tapered edge to a uniform 1.7 px once zoomed out. Scaling the
+ * whole edge by one factor until its narrow end reaches the floor keeps the taper at every zoom.
+ */
+export const TAPERED_THICKNESS_GLSL = `max(1.0, ${EDGE_MIN_END_PX.toFixed(2)} * u_sqrtZoomRatio / ${(
+    EDGE_BASE_SIZE * EDGE_TAPER_END
+).toFixed(4)}) * normalLength`;
+
 /** Edge width multiplier at `t` along the edge (0 = source, 1 = target). */
 export const edgeTaper = (t: number): number => EDGE_TAPER_START + (EDGE_TAPER_END - EDGE_TAPER_START) * t;
 
@@ -170,6 +185,31 @@ export const getLabelScale = (inverseSqrtZoomRatio: number): number => {
 /** Number of leaves currently folded into `node` (0 when none). */
 export const getCollapsedCount = (attrs: Attributes): number =>
     (attrs.collapsedMembers as string[] | undefined)?.length ?? 0;
+
+/**
+ * What a count bubble stands for, e.g. "694 Computers folded in (HasSession)", for the hover tooltip.
+ * Empty when the node has nothing folded into it.
+ */
+export const describeCollapsed = (graph: MultiDirectedGraph, node: string): string => {
+    if (!graph.hasNode(node)) return '';
+    const members: string[] = graph.getNodeAttribute(node, 'collapsedMembers') ?? [];
+    if (!members.length) return '';
+    const kinds = new Map<string, number>();
+    const edges = new Set<string>();
+    members.forEach((member) => {
+        if (!graph.hasNode(member)) return;
+        const kind = (graph.getNodeAttribute(member, 'kind') as string) || 'node';
+        kinds.set(kind, (kinds.get(kind) ?? 0) + 1);
+        graph.edges(member, node).forEach((e) => edges.add(graph.getEdgeAttribute(e, 'label')));
+        graph.edges(node, member).forEach((e) => edges.add(graph.getEdgeAttribute(e, 'label')));
+    });
+    const what = [...kinds.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([kind, count]) => `${count} ${kind}${count === 1 ? '' : 's'}`)
+        .join(', ');
+    const via = [...edges].filter(Boolean).sort().join(', ');
+    return `${what} folded in${via ? ` (${via})` : ''}, each connected only to this node. Double-click, or right-click > Expand, to show them.`;
+};
 
 /**
  * Legacy-style node collapse: when a node has at least `threshold` leaf neighbours (nodes whose only
