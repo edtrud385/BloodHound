@@ -68,7 +68,8 @@ const CypherSearchInner = ({
     const { data: featureFlagData, isLoading, isError } = useFeatureFlag('tier_management_engine');
     const privilegeZonesEnabled = !isLoading && !isError && featureFlagData?.enabled;
 
-    const [showCommonQueries, setShowCommonQueries] = useState(false);
+    // Saved queries start expanded every time the Cypher tab opens (Legacy-style); the toggle still collapses them
+    const [showCommonQueries, setShowCommonQueries] = useState(true);
     const [messageState, setMessageState] = useState<MessageState>({
         showMessage: false,
         message: '',
