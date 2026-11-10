@@ -44,6 +44,21 @@ This UI expects a CE 9.x server. Against CE 8.x the node panel and the right-cli
 because 8.x has no `/api/v2/nodes/{id}` endpoint. Graphs still draw: 8.x sends edges without ids, and
 the UI falls back to a source/kind/target key for them.
 
+## Save as PNG
+
+**Export > PNG** saves the graph exactly as it is on screen (at screen resolution, on the current light or dark
+background). **Export > PNG options…** sets where and how:
+
+- **Folder**: chosen once with *Choose…* and remembered across reloads; *Change…* picks another. If the browser
+  has forgotten write access (after a restart), the next save asks to allow it again.
+- **File name**: the name before the number (default `bloodhound`).
+- **Number the files automatically**: on, each save goes straight into the folder as the next free number,
+  `bloodhound-001.png`, `bloodhound-002.png`, … (it looks at what is already in the folder, so it never
+  overwrites). Off, a Save As dialog opens in that folder for each PNG.
+
+Picking a folder needs Chrome or Edge (File System Access API). Other browsers download to the Downloads folder
+with the same numbered name.
+
 ## Back button
 
 The ← button just left of the filter icon steps back to the previous graph (a browser back: every search,
