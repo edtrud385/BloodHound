@@ -65,7 +65,10 @@ export const NODE_LABEL_BACKGROUND = false;
 export const EDGE_LABEL_ALONG_EDGE = true;
 
 /** Icons are drawn at this fraction of CE's size so names stand out, like Legacy (labels keep their size). */
-export const NODE_ICON_SCALE = 0.6;
+export const NODE_ICON_SCALE = 0.75;
+
+/** Font weight of node labels (CE uses bold; Legacy-style labels are regular weight). */
+export const NODE_LABEL_WEIGHT = 'normal';
 
 /** Legacy-style tapered edges: width at the source end and at the target end, relative to CE's width. */
 export const EDGE_TAPER_START = 1.6;

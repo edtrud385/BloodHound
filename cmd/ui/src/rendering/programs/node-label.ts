@@ -16,7 +16,7 @@
 
 import { truncateText } from 'bh-shared-ui';
 import { Settings } from 'sigma/settings';
-import { NODE_LABEL_BACKGROUND, SHOW_NODE_SUBLABELS } from '../legacyView';
+import { NODE_LABEL_BACKGROUND, NODE_LABEL_WEIGHT, SHOW_NODE_SUBLABELS } from '../legacyView';
 import {
     EDGE_MIDDLE_ALIGN_OFFSET,
     EDGE_TYPES,
@@ -93,7 +93,8 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
           : settings.labelColor.color;
     const nodeSize = data.size ?? 0;
 
-    context.font = `bold ${size}px ${font}`;
+    // Legacy view: normal weight (CE draws node labels bold)
+    context.font = `${NODE_LABEL_WEIGHT} ${size}px ${font}`;
 
     const primaryParams: LabelBoundsParams = {
         inverseSqrtZoomRatio,
