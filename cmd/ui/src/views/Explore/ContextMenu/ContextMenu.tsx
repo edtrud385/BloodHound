@@ -25,7 +25,7 @@ import {
     useFeatureFlag,
     usePermissions,
 } from 'bh-shared-ui';
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
 import { selectOwnedAssetGroupId, selectTierZeroAssetGroupId } from 'src/ducks/assetgroups/reducer';
 import { useAppSelector } from 'src/store';
 import AssetGroupMenuItem from './AssetGroupMenuItem';
@@ -33,7 +33,9 @@ import AssetGroupMenuItem from './AssetGroupMenuItem';
 const ContextMenu: FC<{
     contextMenu: { mouseX: number; mouseY: number } | null;
     handleClose: () => void;
-}> = ({ contextMenu, handleClose }) => {
+    /** Extra items shown at the top of the menu (e.g. the Legacy view's expand/collapse). */
+    children?: ReactNode;
+}> = ({ contextMenu, handleClose, children }) => {
     const { primarySearch, secondarySearch, setExploreParams } = useExploreParams();
     const { selectedItemQuery } = useExploreSelectedItem();
     const { data: tierFlag } = useFeatureFlag('tier_management_engine');
@@ -74,6 +76,7 @@ const ContextMenu: FC<{
             anchorReference='anchorPosition'
             onClose={handleClose}
             onClick={handleClose}>
+            {children}
             <MenuItem onClick={handleSetStartingNode}>Set as starting node</MenuItem>
             <MenuItem onClick={handleSetEndingNode}>Set as ending node</MenuItem>
 

@@ -319,14 +319,27 @@ export const GraphEvents = forwardRef(function GraphEvents(
         sigmaContainer,
     ]);
 
+    // Legacy view: expanding or folding leaves changes which nodes are drawn without replacing the graph,
+    // so recompute the path highlight whenever the layout version changes.
+    const [layoutVersion, setLayoutVersion] = useState(0);
+    useEffect(() => {
+        const update = () => setLayoutVersion(graph.getAttribute('layoutVersion') ?? 0);
+        graph.on('attributesUpdated', update);
+        return () => {
+            graph.removeListener('attributesUpdated', update);
+        };
+    }, [graph]);
+
     const isHighlightedItemInGraph = useMemo(
         () => getIsHighlightedItemInGraph(graph, highlightedItem),
-        [graph, highlightedItem]
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [graph, highlightedItem, layoutVersion]
     );
 
     const { highlightedNodeIds, highlightedEdgeIds } = useMemo(
         () => getFullPathHighlightedEntities(graph, highlightedItem),
-        [graph, highlightedItem]
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [graph, highlightedItem, layoutVersion]
     );
 
     useEffect(() => {

@@ -174,13 +174,73 @@ export const collapseLeaves = (graph: MultiDirectedGraph, threshold = COLLAPSE_T
     syncHiddenPositions(graph);
 };
 
-/** Expand the leaves folded into `node`. Returns the ids that were revealed. */
+/** Expand the leaves folded into `node` (they can be folded back with `recollapse`). Returns the ids revealed. */
 export const expandCollapsed = (graph: MultiDirectedGraph, node: string): string[] => {
     if (!graph.hasNode(node)) return [];
     const members: string[] = graph.getNodeAttribute(node, 'collapsedMembers') ?? [];
     members.forEach((member) => graph.hasNode(member) && graph.setNodeAttribute(member, 'hidden', false));
     graph.removeNodeAttribute(node, 'collapsedMembers');
+    // Remember them so they can be folded back from the right-click menu
+    if (members.length) graph.setNodeAttribute(node, 'expandedMembers', members);
     return members;
+};
+
+/** Number of leaves that were expanded in place from `node` and can be folded back (0 when none). */
+export const getExpandedCount = (attrs: Attributes): number =>
+    (attrs.expandedMembers as string[] | undefined)?.length ?? 0;
+
+/** Rows per column when expanded leaves are laid out next to their parent. */
+const EXPAND_ROW_SPACING = 70;
+const EXPAND_COLUMN_SPACING = 320;
+const EXPAND_OFFSET = 500;
+
+/**
+ * Expand the leaves folded into `node` without touching the rest of the layout: every other node
+ * stays where it is and the leaves are placed in a block beside their parent (left of it when they
+ * point at it, right of it when it points at them, matching the left-to-right flow). The parent
+ * remembers them so they can be folded back with `recollapse`. Returns the ids that were revealed.
+ */
+export const expandInPlace = (graph: MultiDirectedGraph, node: string): string[] => {
+    if (!graph.hasNode(node)) return [];
+    const { x: px, y: py } = graph.getNodeAttributes(node);
+    const members = expandCollapsed(graph, node).filter((member) => graph.hasNode(member));
+    if (!members.length) return [];
+
+    const incoming = members.filter((member) => graph.hasEdge(member, node));
+    const outgoing = members.filter((member) => !graph.hasEdge(member, node));
+
+    const place = (group: string[], side: -1 | 1) => {
+        if (!group.length) return;
+        // Roughly 5 rows per column keeps the block about as tall as it is wide once labels are counted
+        const rows = Math.min(group.length, Math.max(1, Math.ceil(Math.sqrt(group.length * 5))));
+        const columns = Math.ceil(group.length / rows);
+        group.forEach((member, i) => {
+            const column = Math.floor(i / rows);
+            const row = i % rows;
+            const rowsInColumn = column === columns - 1 ? group.length - column * rows : rows;
+            graph.setNodeAttribute(member, 'x', px + side * (EXPAND_OFFSET + column * EXPAND_COLUMN_SPACING));
+            graph.setNodeAttribute(member, 'y', py + (row - (rowsInColumn - 1) / 2) * EXPAND_ROW_SPACING);
+        });
+    };
+    place(incoming, -1);
+    place(outgoing, 1);
+
+    markLayoutChanged(graph);
+    return members;
+};
+
+/** Fold leaves expanded with `expandInPlace` back into their parent's count bubble. */
+export const recollapse = (graph: MultiDirectedGraph, node: string): void => {
+    if (!graph.hasNode(node)) return;
+    const members = ((graph.getNodeAttribute(node, 'expandedMembers') as string[] | undefined) ?? []).filter((member) =>
+        graph.hasNode(member)
+    );
+    graph.removeNodeAttribute(node, 'expandedMembers');
+    if (!members.length) return;
+    members.forEach((member) => graph.setNodeAttribute(member, 'hidden', true));
+    graph.setNodeAttribute(node, 'collapsedMembers', members);
+    syncHiddenPositions(graph);
+    markLayoutChanged(graph);
 };
 
 /** Find the node whose count bubble currently hides `nodeId`, if any. */
