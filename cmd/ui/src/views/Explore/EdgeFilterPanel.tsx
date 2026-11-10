@@ -99,8 +99,16 @@ const EdgeFilterPanel: FC<EdgeFilterPanelProps> = ({ anchorEl, onClose, graph })
     const canRecalculate = exploreSearchTab === 'cypher' && searchType === 'cypher' && !!cypherSearch;
     const hidden = useMemo(() => new Set(filter.hiddenKinds), [filter.hiddenKinds]);
     const groups = useMemo(() => groupGraphEdges(graph), [graph]);
-    const inGraph = useMemo(() => new Set(groups.flatMap((g) => g.kinds.map((k) => k.kind))), [groups]);
-    const hiddenElsewhere = filter.hiddenKinds.filter((kind) => !inGraph.has(kind));
+    const countByKind = useMemo(
+        () => new Map(groups.flatMap((g) => g.kinds.map((k) => [k.kind, k.count] as const))),
+        [groups]
+    );
+    // Unticked types are listed together under Hidden (so they can be ticked back even once a
+    // Recalculate has removed them from the graph); the categories show the types still visible
+    const hiddenList = [...filter.hiddenKinds].sort((a, b) => a.localeCompare(b));
+    const visibleGroups = groups
+        .map((group) => ({ ...group, kinds: group.kinds.filter((k) => !hidden.has(k.kind)) }))
+        .filter((group) => group.kinds.length > 0);
     const [viewName, setViewName] = useState('');
 
     return (
@@ -175,10 +183,49 @@ const EdgeFilterPanel: FC<EdgeFilterPanelProps> = ({ anchorEl, onClose, graph })
             </div>
             <Divider />
             <div className='overflow-auto px-3 py-1 grow'>
+                {hiddenList.length > 0 && (
+                    <div className='py-1' data-testid='explore_edge-filter-hidden'>
+                        <FormControlLabel
+                            label={<span className='font-semibold text-sm'>Hidden ({hiddenList.length})</span>}
+                            control={
+                                <Checkbox
+                                    size='small'
+                                    checked={false}
+                                    onChange={() => setEdgeKindsHidden(hiddenList, false)}
+                                    inputProps={{ 'aria-label': 'Show all hidden edge types' }}
+                                />
+                            }
+                        />
+                        <div className='pl-6 flex flex-col'>
+                            {hiddenList.map((kind) => (
+                                <FormControlLabel
+                                    key={kind}
+                                    className='-my-1'
+                                    label={
+                                        <span className='text-sm'>
+                                            {kind}{' '}
+                                            <span className='opacity-60'>
+                                                {countByKind.has(kind)
+                                                    ? `(${countByKind.get(kind)})`
+                                                    : '(not in this graph)'}
+                                            </span>
+                                        </span>
+                                    }
+                                    control={
+                                        <Checkbox
+                                            size='small'
+                                            checked={false}
+                                            onChange={() => setEdgeKindsHidden([kind], false)}
+                                        />
+                                    }
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
                 {groups.length === 0 && <p className='py-3 text-sm'>No edges in the current graph.</p>}
-                {groups.map((group) => {
+                {visibleGroups.map((group) => {
                     const kinds = group.kinds.map((k) => k.kind);
-                    const hiddenCount = kinds.filter((kind) => hidden.has(kind)).length;
                     return (
                         <div key={group.name} className='py-1'>
                             <FormControlLabel
@@ -186,8 +233,7 @@ const EdgeFilterPanel: FC<EdgeFilterPanelProps> = ({ anchorEl, onClose, graph })
                                 control={
                                     <Checkbox
                                         size='small'
-                                        checked={hiddenCount === 0}
-                                        indeterminate={hiddenCount > 0 && hiddenCount < kinds.length}
+                                        checked
                                         onChange={(e) => setEdgeKindsHidden(kinds, !e.target.checked)}
                                     />
                                 }
@@ -205,8 +251,8 @@ const EdgeFilterPanel: FC<EdgeFilterPanelProps> = ({ anchorEl, onClose, graph })
                                         control={
                                             <Checkbox
                                                 size='small'
-                                                checked={!hidden.has(kind)}
-                                                onChange={(e) => setEdgeKindsHidden([kind], !e.target.checked)}
+                                                checked
+                                                onChange={() => setEdgeKindsHidden([kind], true)}
                                             />
                                         }
                                     />
@@ -215,11 +261,6 @@ const EdgeFilterPanel: FC<EdgeFilterPanelProps> = ({ anchorEl, onClose, graph })
                         </div>
                     );
                 })}
-                {hiddenElsewhere.length > 0 && (
-                    <p className='py-2 text-xs opacity-70'>
-                        Also hidden (not in this graph): {hiddenElsewhere.join(', ')}
-                    </p>
-                )}
             </div>
             <Divider />
             <div className='px-3 py-2 flex flex-col'>
