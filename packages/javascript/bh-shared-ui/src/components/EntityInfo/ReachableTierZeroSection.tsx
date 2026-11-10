@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { List, ListItemButton, ListItemText } from '@mui/material';
 import { GraphNode } from 'js-client-library';
 import React from 'react';
 import { useQuery } from 'react-query';
@@ -58,9 +57,12 @@ const fetchTargets = async (objectId: string): Promise<GraphNode[]> => {
     }
 };
 
+/**
+ * Like Legacy, this row only draws the graph: clicking it runs the paths query and keeps this node selected.
+ * It never opens into a list (the count can run into the hundreds).
+ */
 const ReachableTierZeroSection: React.FC<EntityInfoDataTableProps> = ({ id, label = REACHABLE_TIER_ZERO_LABEL }) => {
-    const { setExploreParams, expandedPanelSections } = useExploreParams();
-    const isExpanded = ((expandedPanelSections ?? []) as string[]).includes(label);
+    const { setExploreParams } = useExploreParams();
 
     const targetsQuery = useQuery(['reachable-tier-zero', id], () => fetchTargets(id), {
         enabled: !!id,
@@ -68,46 +70,26 @@ const ReachableTierZeroSection: React.FC<EntityInfoDataTableProps> = ({ id, labe
         retry: false,
         staleTime: 5 * 60_000,
     });
-    const targets = targetsQuery.data ?? [];
 
-    const handleChange = (isOpen: boolean) => {
-        if (!isOpen) {
-            setExploreParams({ expandedPanelSections: [] });
-            return;
-        }
+    const drawGraph = () =>
         setExploreParams({
+            // Marks the selection to keep when the paths load (see ExploreSearch)
             expandedPanelSections: [label],
             searchType: 'cypher',
             exploreSearchTab: 'cypher',
             cypherSearch: encodeCypherQuery(reachableTierZeroQuery(id)),
         });
-    };
 
     return (
         <EntityInfoCollapsibleSection
             label={label}
-            count={targetsQuery.isSuccess ? targets.length : undefined}
-            isExpanded={isExpanded}
+            count={targetsQuery.isSuccess ? targetsQuery.data.length : undefined}
+            isExpanded={false}
             isLoading={targetsQuery.isLoading}
             isError={targetsQuery.isError}
             error={targetsQuery.error}
-            onChange={handleChange}>
-            <List dense disablePadding data-testid='reachable-tier-zero-list'>
-                {targets.map((target) => (
-                    <ListItemButton
-                        key={target.objectId}
-                        onClick={() =>
-                            setExploreParams({
-                                primarySearch: target.objectId,
-                                searchType: 'node',
-                                exploreSearchTab: 'node',
-                            })
-                        }>
-                        <ListItemText primary={target.label} secondary={target.kind} />
-                    </ListItemButton>
-                ))}
-            </List>
-        </EntityInfoCollapsibleSection>
+            onChange={drawGraph}
+        />
     );
 };
 
