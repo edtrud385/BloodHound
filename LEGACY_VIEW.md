@@ -51,8 +51,9 @@ CE calls high value *Tier Zero* (the `Tag_Tier_Zero` label), so it is named **Re
 
 - The count is every Tier Zero object the selected node reaches by a shortest path over traversable edges (CE's
   pathfinding edge list for AD and Azure), including Tier Zero objects on the way.
-- Opening it draws those paths (as a Cypher query, so it shows on the Cypher tab and can be edited) and keeps the
-  node selected with the section open; the list underneath names each target, and clicking one searches for it.
+- Clicking it only draws those paths, as in Legacy (it never opens into a list, since the count can run into the
+  hundreds). The paths run as a Cypher query, so they show on the Cypher tab and can be edited, and the node stays
+  selected.
 - The count is usually higher than Legacy's for the same data: CE tags far more objects Tier Zero than Legacy marked
   high value (the GPOs, OUs, containers and certificate templates that control Tier Zero, not just the admin
   groups, Domain and DCs).
