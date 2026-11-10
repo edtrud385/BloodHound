@@ -34,12 +34,14 @@ import {
     BUILTIN_EDGE_CATEGORIES,
     applyEdgeFilterView,
     deleteEdgeFilterView,
+    recalculateWithEdgeFilter,
     resetEdgeFilter,
     saveEdgeFilterView,
     setApplyEdgeFilterToQueries,
     setEdgeKindsHidden,
     setHideOrphans,
     useEdgeFilter,
+    useExploreParams,
 } from 'bh-shared-ui';
 import { MultiDirectedGraph } from 'graphology';
 import { Attributes } from 'graphology-types';
@@ -92,6 +94,9 @@ type EdgeFilterPanelProps = {
  */
 const EdgeFilterPanel: FC<EdgeFilterPanelProps> = ({ anchorEl, onClose, graph }) => {
     const filter = useEdgeFilter();
+    const { exploreSearchTab, searchType, cypherSearch } = useExploreParams();
+    // Recalculate (Legacy's button): re-run the current Cypher query once without the unticked edges
+    const canRecalculate = exploreSearchTab === 'cypher' && searchType === 'cypher' && !!cypherSearch;
     const hidden = useMemo(() => new Set(filter.hiddenKinds), [filter.hiddenKinds]);
     const groups = useMemo(() => groupGraphEdges(graph), [graph]);
     const inGraph = useMemo(() => new Set(groups.flatMap((g) => g.kinds.map((k) => k.kind))), [groups]);
@@ -228,18 +233,34 @@ const EdgeFilterPanel: FC<EdgeFilterPanelProps> = ({ anchorEl, onClose, graph })
                         />
                     }
                 />
-                <Tooltip title='Also remove the unticked edge types from every Cypher query and re-run it, so paths around them show up (like Legacy).'>
-                    <FormControlLabel
-                        label={<span className='text-sm'>Apply filter to every query</span>}
-                        control={
-                            <Checkbox
-                                size='small'
-                                checked={filter.applyToQueries}
-                                onChange={(e) => setApplyEdgeFilterToQueries(e.target.checked)}
-                            />
-                        }
-                    />
-                </Tooltip>
+                <div className='flex items-center justify-between gap-2'>
+                    <Tooltip title='Also remove the unticked edge types from every Cypher query and re-run it, so paths around them show up (like Legacy).'>
+                        <FormControlLabel
+                            label={<span className='text-sm'>Apply filter to every query</span>}
+                            control={
+                                <Checkbox
+                                    size='small'
+                                    checked={filter.applyToQueries}
+                                    onChange={(e) => setApplyEdgeFilterToQueries(e.target.checked)}
+                                />
+                            }
+                        />
+                    </Tooltip>
+                    {canRecalculate && (
+                        <Tooltip title='Re-run this Cypher query once without the unticked edge types, then lay out and refit the graph.'>
+                            <span>
+                                <Button
+                                    size='small'
+                                    variant='outlined'
+                                    disabled={filter.applyToQueries}
+                                    onClick={() => cypherSearch && recalculateWithEdgeFilter(cypherSearch)}
+                                    data-testid='explore_edge-filter-recalculate'>
+                                    Recalculate
+                                </Button>
+                            </span>
+                        </Tooltip>
+                    )}
+                </div>
             </div>
         </Popover>
     );

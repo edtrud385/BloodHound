@@ -17,7 +17,7 @@ import { RelationshipDetailsWithInfo } from 'js-client-library';
 import { useQuery } from 'react-query';
 import { SNACKBAR_DURATION_LONG } from '../../constants';
 import { useNotifications } from '../../providers';
-import { useEdgeFilter } from '../../utils/edgeViewFilter';
+import { getQueryHiddenEdgeKinds, useEdgeFilter } from '../../utils/edgeViewFilter';
 import { useTimeoutLimitConfiguration } from '../useConfiguration';
 import { ExploreQueryParams, useExploreParams } from '../useExploreParams';
 import { isRelationshipResponse, useGraphItem } from '../useGraphItem';
@@ -74,9 +74,10 @@ export const useExploreGraph = (options: ExploreGraphQueryOptions = {}) => {
     const { data } = useGraphItem(params.relationshipQueryItemId);
     const relationshipDetails = data && isRelationshipResponse(data) ? data : undefined;
 
-    // Legacy-style edge filter: when applied to queries, hidden edge kinds are stripped before running
+    // Legacy-style edge filter: hidden edge kinds are stripped before running when applied to every query,
+    // or for the current query after Recalculate
     const edgeFilter = useEdgeFilter();
-    const queryHiddenEdgeKinds = edgeFilter.applyToQueries ? edgeFilter.hiddenKinds : [];
+    const queryHiddenEdgeKinds = getQueryHiddenEdgeKinds(edgeFilter, params.cypherSearch);
 
     const query = exploreGraphQueryFactory(params, { userSettings, relationshipDetails, queryHiddenEdgeKinds });
 

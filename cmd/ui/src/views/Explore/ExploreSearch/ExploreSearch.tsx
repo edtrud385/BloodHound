@@ -246,11 +246,8 @@ const ExploreSearch: React.FC<ExploreSearchProps> = ({ onOpenEdgeFilter }) => {
                     <IconButton
                         aria-label={edgeFilterLabel}
                         title={edgeFilterLabel}
-                        aria-pressed={edgeFilter.hiddenKinds.length > 0}
                         data-testid='explore_search-container_header_edge-filter'
-                        className={cn('rounded-sm mr-1', {
-                            '!bg-primary !text-white dark:!text-neutral-1': edgeFilter.hiddenKinds.length > 0,
-                        })}
+                        className='rounded-sm mr-1'
                         onClick={(event) => onOpenEdgeFilter(event.currentTarget)}>
                         <FontAwesomeIcon icon={faFilter} />
                     </IconButton>

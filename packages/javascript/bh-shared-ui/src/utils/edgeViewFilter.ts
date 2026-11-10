@@ -38,6 +38,11 @@ export type EdgeFilterState = EdgeFilterSettings & {
     /** Name of the view the settings came from; cleared as soon as they are changed. */
     viewName?: string;
     views: EdgeFilterView[];
+    /**
+     * One-off "Recalculate": the hidden kinds to strip from one Cypher query (the encoded cypherSearch it
+     * was pressed for), even with applyToQueries off. A different query runs unfiltered again.
+     */
+    recalculated?: { query: string; hiddenKinds: string[] };
 };
 
 const STORAGE_KEY = 'bh-edge-view-filter';
@@ -57,6 +62,12 @@ const load = (): EdgeFilterState => {
             applyToQueries: parsed.applyToQueries === true,
             viewName: typeof parsed.viewName === 'string' ? parsed.viewName : undefined,
             views: Array.isArray(parsed.views) ? parsed.views.filter((v: any) => v && typeof v.name === 'string') : [],
+            recalculated:
+                parsed.recalculated &&
+                typeof parsed.recalculated.query === 'string' &&
+                Array.isArray(parsed.recalculated.hiddenKinds)
+                    ? { query: parsed.recalculated.query, hiddenKinds: parsed.recalculated.hiddenKinds }
+                    : undefined,
         };
     } catch {
         return DEFAULT_STATE;
@@ -133,8 +144,20 @@ export const deleteEdgeFilterView = (name: string) =>
         viewName: state.viewName === name ? undefined : state.viewName,
     });
 
+/** Re-run `query` (the encoded cypherSearch) once without the currently hidden edge kinds. */
+export const recalculateWithEdgeFilter = (query: string) =>
+    commit({ ...state, recalculated: { query, hiddenKinds: state.hiddenKinds } });
+
+/** Edge kinds to strip from the Cypher query `query` (encoded cypherSearch): always, or after Recalculate. */
+export const getQueryHiddenEdgeKinds = (filter: EdgeFilterState, query?: string | null): string[] => {
+    if (filter.applyToQueries) return filter.hiddenKinds;
+    if (query && filter.recalculated?.query === query) return filter.recalculated.hiddenKinds;
+    return [];
+};
+
 /** Show every edge again (keeps saved views). */
-export const resetEdgeFilter = () => update({ hiddenKinds: [], applyToQueries: false });
+export const resetEdgeFilter = () =>
+    commit({ ...state, hiddenKinds: [], applyToQueries: false, viewName: undefined, recalculated: undefined });
 
 /**
  * Remove `hiddenKinds` from every multi-type relationship list in a Cypher query, e.g.
