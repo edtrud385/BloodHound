@@ -23,6 +23,7 @@ export * from './content';
 export * from './copyToClipboard';
 export * from './datePicker';
 export * from './datetime';
+export * from './edgeViewFilter';
 export * from './entityInfoDisplay';
 export * from './environments';
 export * from './exportGraphData';

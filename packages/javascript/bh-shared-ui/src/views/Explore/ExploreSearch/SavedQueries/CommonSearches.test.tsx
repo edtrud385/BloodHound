@@ -106,10 +106,10 @@ describe('CommonSearches', () => {
 
         const platformLabel = await screen.findByLabelText(/platforms/i);
         const categoriesLabel = await screen.findByLabelText(/categories/i);
-        const sourceLabel = await screen.findByLabelText(/source/i);
         expect(platformLabel).toBeInTheDocument();
         expect(categoriesLabel).toBeInTheDocument();
-        expect(sourceLabel).toBeInTheDocument();
+        // The Source filter was removed (prebuilt vs saved is now the query-set switch)
+        expect(screen.queryByLabelText(/^source$/i)).toBeNull();
     });
 
     it('renders a filter search and platform dropdown menu', async () => {

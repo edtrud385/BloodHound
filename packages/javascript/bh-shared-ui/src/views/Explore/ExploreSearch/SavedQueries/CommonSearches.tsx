@@ -19,6 +19,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { TextButton, ToggleGroup, ToggleGroupItem } from 'doodle-ui';
 import fileDownload from 'js-file-download';
 import { useMemo, useState } from 'react';
+import { useQueryClient } from 'react-query';
 import PrebuiltSearchList from '../../../../components/PrebuiltSearchList';
 import { getExportQuery, useDeleteSavedQuery, usePrebuiltQueries } from '../../../../hooks';
 import { getStoredQuerySet, storeQuerySet } from '../../../../hooks/usePrebuiltQueries';
@@ -28,7 +29,7 @@ import { QueryLineItem, QueryListSection } from '../../../../types';
 import { cn } from '../../../../utils';
 import { useSavedQueriesContext } from '../../providers';
 import ConfirmDeleteQueryDialog from './ConfirmDeleteQueryDialog';
-import QueryPickerDialog, { fillPickerQuery } from './QueryPicker';
+import QueryPickerDialog, { fetchPickerOptions, fillPickerQuery, pickerOptionsQueryKey } from './QueryPicker';
 import QuerySearchFilter from './QuerySearchFilter';
 
 type CommonSearchesProps = {
@@ -141,6 +142,7 @@ const CommonSearches = ({
 
     // Legacy-style picker step: the clicked query whose "Select a ..." dialog is open
     const [pickingFor, setPickingFor] = useState<QueryLineItem>();
+    const queryClient = useQueryClient();
 
     const runQuery = (query: string, id: number | undefined, cypher: string = query) => {
         setSelected({ query, id });
@@ -157,8 +159,15 @@ const CommonSearches = ({
     const handleClick = (query: string, id: number | undefined) => {
         const item = queryList.flatMap((section) => section.queries).find((q) => q.query === query && q.id === id);
         if (item?.picker) {
-            // Ask first, like Legacy; nothing runs until a choice is made
-            setPickingFor(item);
+            // Ask first, like Legacy, but only when there is a real choice: with a single domain, group or
+            // role (or none) the query just runs.
+            const picker = item.picker;
+            queryClient
+                .fetchQuery(pickerOptionsQueryKey(picker.options), () => fetchPickerOptions(picker.options), {
+                    staleTime: 60_000,
+                })
+                .then((options) => (options.length > 1 ? setPickingFor(item) : runQuery(query, id)))
+                .catch(() => setPickingFor(item));
         } else if (selected.query === query && selected.id === id) {
             //deselect
             setSelected({ query: '', id: undefined });

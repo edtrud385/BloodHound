@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { faLayerGroup, faRoute } from '@fortawesome/free-solid-svg-icons';
+import { faFilter, faLayerGroup, faRoute } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { MenuItem } from '@mui/material';
 import {
@@ -39,6 +39,7 @@ import {
     useAppName,
     useAutomaticGraphActions,
     useCustomNodeKinds,
+    useEdgeFilter,
     useExploreParams,
     useExploreSelectedItem,
     useExploreTableAutoDisplay,
@@ -82,13 +83,14 @@ import {
 import { useAppDispatch, useAppSelector } from 'src/store';
 import { initGraph } from 'src/views/Explore/utils';
 import ContextMenu from './ContextMenu/ContextMenu';
+import EdgeFilterPanel from './EdgeFilterPanel';
 import ExploreSearch from './ExploreSearch/ExploreSearch';
 import { transformIconDictionary } from './svgIcons';
 
 /** Legacy view: one icon button in the graph controls row, styled like CE's own controls */
 const LegacyControlButton: FC<{
     label: string;
-    onClick: () => void;
+    onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
     pressed?: boolean;
     disabled?: boolean;
     testId: string;
@@ -241,6 +243,10 @@ const GraphView: FC = () => {
               ),
           ].filter(Boolean)
         : null;
+
+    /* Legacy-style edge filter panel */
+    const [edgeFilterAnchor, setEdgeFilterAnchor] = useState<HTMLElement | null>(null);
+    const edgeFilter = useEdgeFilter();
 
     /* Legacy view: label size control (node and edge labels), remembered in this browser */
     const [labelSize, setLabelSize] = useState(getLabelSizeMultiplier);
@@ -436,6 +442,17 @@ const GraphView: FC = () => {
                         }}
                     />
                     <LegacyControlButton
+                        label={
+                            edgeFilter.hiddenKinds.length
+                                ? `Edge Filter (${edgeFilter.hiddenKinds.length} hidden${edgeFilter.applyToQueries ? ', applied to queries' : ''})`
+                                : 'Edge Filter'
+                        }
+                        pressed={edgeFilter.hiddenKinds.length > 0}
+                        onClick={(event) => setEdgeFilterAnchor(event.currentTarget)}
+                        testId='explore_graph-controls_edge-filter'>
+                        <FontAwesomeIcon aria-hidden='true' icon={faFilter} />
+                    </LegacyControlButton>
+                    <LegacyControlButton
                         label={collapseLeafNodes ? 'Expand Collapsed Nodes' : 'Collapse Leaf Nodes'}
                         pressed={collapseLeafNodes}
                         onClick={toggleCollapseLeafNodes}
@@ -470,6 +487,11 @@ const GraphView: FC = () => {
                 </div>
             </div>
             <GraphItemInformationPanel />
+            <EdgeFilterPanel
+                anchorEl={edgeFilterAnchor}
+                onClose={() => setEdgeFilterAnchor(null)}
+                graph={graphologyGraph}
+            />
             <FeatureFlag
                 flagKey='tier_management_engine'
                 enabled={

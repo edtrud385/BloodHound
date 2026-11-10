@@ -37,7 +37,7 @@ export const fillPickerQuery = (picker: QueryPickerType, value: string): string 
     picker.query.split('$result').join(toCypherString(value));
 
 /** Names of the nodes a picker offers, sorted. An empty result (CE answers 404) means no options. */
-const fetchPickerOptions = async (optionsQuery: string): Promise<string[]> => {
+export const fetchPickerOptions = async (optionsQuery: string): Promise<string[]> => {
     try {
         const response = await apiClient.cypherSearch(optionsQuery);
         const nodes = Object.values(response.data?.data?.nodes ?? {});
@@ -48,6 +48,8 @@ const fetchPickerOptions = async (optionsQuery: string): Promise<string[]> => {
         throw error;
     }
 };
+
+export const pickerOptionsQueryKey = (optionsQuery?: string) => ['prebuilt-query-picker', optionsQuery];
 
 type QueryPickerDialogProps = {
     /** The picker of the clicked query; the dialog is open while this is set. */
@@ -62,11 +64,11 @@ type QueryPickerDialogProps = {
  * role to run it for, then runs it for that one (or for all of them).
  */
 const QueryPickerDialog = ({ picker, onPick, onClose }: QueryPickerDialogProps) => {
-    const optionsQuery = useQuery(
-        ['prebuilt-query-picker', picker?.options],
-        () => fetchPickerOptions(picker!.options),
-        { enabled: !!picker, staleTime: 60_000, refetchOnWindowFocus: false }
-    );
+    const optionsQuery = useQuery(pickerOptionsQueryKey(picker?.options), () => fetchPickerOptions(picker!.options), {
+        enabled: !!picker,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+    });
     const options = optionsQuery.data ?? [];
 
     return (

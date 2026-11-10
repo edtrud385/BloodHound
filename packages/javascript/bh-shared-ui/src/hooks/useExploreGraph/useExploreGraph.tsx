@@ -17,6 +17,7 @@ import { RelationshipDetailsWithInfo } from 'js-client-library';
 import { useQuery } from 'react-query';
 import { SNACKBAR_DURATION_LONG } from '../../constants';
 import { useNotifications } from '../../providers';
+import { useEdgeFilter } from '../../utils/edgeViewFilter';
 import { useTimeoutLimitConfiguration } from '../useConfiguration';
 import { ExploreQueryParams, useExploreParams } from '../useExploreParams';
 import { isRelationshipResponse, useGraphItem } from '../useGraphItem';
@@ -37,9 +38,11 @@ export function exploreGraphQueryFactory(
     {
         userSettings,
         relationshipDetails,
+        queryHiddenEdgeKinds = [],
     }: {
         userSettings: UserSettings;
         relationshipDetails?: RelationshipDetailsWithInfo;
+        queryHiddenEdgeKinds?: string[];
     }
 ): ExploreGraphQuery {
     switch (paramOptions.searchType) {
@@ -52,7 +55,7 @@ export function exploreGraphQueryFactory(
         case 'composition':
             return compositionSearchQuery(paramOptions, relationshipDetails);
         case 'cypher':
-            return cypherSearchQuery(paramOptions, userSettings);
+            return cypherSearchQuery(paramOptions, userSettings, queryHiddenEdgeKinds);
         case 'aclinheritance':
             return aclInheritanceSearchQuery(paramOptions, relationshipDetails);
         default:
@@ -71,7 +74,11 @@ export const useExploreGraph = (options: ExploreGraphQueryOptions = {}) => {
     const { data } = useGraphItem(params.relationshipQueryItemId);
     const relationshipDetails = data && isRelationshipResponse(data) ? data : undefined;
 
-    const query = exploreGraphQueryFactory(params, { userSettings, relationshipDetails });
+    // Legacy-style edge filter: when applied to queries, hidden edge kinds are stripped before running
+    const edgeFilter = useEdgeFilter();
+    const queryHiddenEdgeKinds = edgeFilter.applyToQueries ? edgeFilter.hiddenKinds : [];
+
+    const query = exploreGraphQueryFactory(params, { userSettings, relationshipDetails, queryHiddenEdgeKinds });
 
     const queryConfig = query.getQueryConfig();
 

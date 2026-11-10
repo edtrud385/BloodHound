@@ -46,7 +46,6 @@ const QuerySearchFilter = (props: QuerySearchProps) => {
     const { selectedQuery } = useSavedQueriesContext();
 
     const [categoriesOpen, setCategoriesOpen] = useState<boolean>(false);
-    const [sourcesOpen, setSourcesOpen] = useState<boolean>(false);
 
     const [showImportDialog, setShowImportDialog] = useState<boolean>(false);
 
@@ -68,10 +67,6 @@ const QuerySearchFilter = (props: QuerySearchProps) => {
             return;
         }
         queryFilterHandler(searchTerm, platform, newVal, source);
-    };
-
-    const handleSourceFilter = (val: string) => {
-        queryFilterHandler(searchTerm, platform, categoryFilter, val);
     };
 
     const exportEnabled = selectedQuery?.id ? true : false;
@@ -149,24 +144,6 @@ const QuerySearchFilter = (props: QuerySearchProps) => {
                                     {category}
                                 </MenuItem>
                             ))}
-                        </Select>
-                    </FormControl>
-                    <FormControl size='small' className='w-full ml-2 z-10'>
-                        <InputLabel id='source-filter-label'>Source</InputLabel>
-                        <Select
-                            labelId='source-filter-label'
-                            id='source-filter'
-                            className='z-10'
-                            value={source || ''}
-                            label='source'
-                            open={sourcesOpen}
-                            onOpen={() => setSourcesOpen(true)}
-                            onClose={() => setSourcesOpen(false)}
-                            onChange={(e) => handleSourceFilter(e.target.value)}>
-                            <MenuItem value=''>All Sources</MenuItem>
-                            <MenuItem value='prebuilt'>Prebuilt</MenuItem>
-                            <MenuItem value='personal'>Personal</MenuItem>
-                            <MenuItem value='shared'>Shared</MenuItem>
                         </Select>
                     </FormControl>
                 </div>
