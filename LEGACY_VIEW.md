@@ -22,6 +22,25 @@ floors, declutter, label boxes, sublabels, edge-label style) are constants in th
 Full node names: CE truncates long labels by default. Turn that off with CE's own "label clipping"
 setting if you want Legacy's full names.
 
+## Query sets and pickers
+
+The Saved Queries panel has a **Sophos Queries / BloodHound CE** switch (remembered in your browser).
+BloodHound CE lists CE's own built-in queries; Sophos Queries lists a local set of review queries. Your
+saved queries show under both. The Platforms filter picks Active Directory or Entra ID, and the
+Categories list only offers that platform's categories.
+
+The Sophos set lives in `packages/javascript/bh-shared-ui/src/commonSearchesSophos.ts`. The repository
+copy is empty on purpose: the real queries are generated locally and never committed (the file is
+marked `skip-worktree`, so git ignores the local copy).
+
+Pre-built queries can carry a Legacy-style **picker** (`QueryPicker` in `types.ts`): the query first
+runs for everything, then a dropdown such as "Select a Domain..." lists the nodes its `options` query
+returns, and choosing one runs the picker's query with `$result` replaced by that node's name.
+
+This UI expects a CE 9.x server. Against CE 8.x the node panel and the right-click menu stay empty,
+because 8.x has no `/api/v2/nodes/{id}` endpoint. Graphs still draw: 8.x sends edges without ids, and
+the UI falls back to a source/kind/target key for them.
+
 ## Large queries (server config, no code change)
 
 CE has no row cap on Cypher results. Large queries are cut off by three server limits, all

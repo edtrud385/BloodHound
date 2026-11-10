@@ -55,7 +55,8 @@ const QuerySearchFilter = (props: QuerySearchProps) => {
     };
 
     const handlePlatformFilter = (val: string) => {
-        queryFilterHandler(searchTerm, val, categoryFilter, source);
+        // Categories depend on the platform, so a platform change starts a fresh category selection
+        queryFilterHandler(searchTerm, val, [], source);
     };
 
     const handleCategoryChange = (event: SelectChangeEvent<typeof categoryFilter>) => {
@@ -125,7 +126,7 @@ const QuerySearchFilter = (props: QuerySearchProps) => {
                             onChange={(e) => handlePlatformFilter(e.target.value)}>
                             <MenuItem value=''>All</MenuItem>
                             <MenuItem value='Active Directory'>Active Directory</MenuItem>
-                            <MenuItem value='Azure'>Azure</MenuItem>
+                            <MenuItem value='Azure'>Entra ID</MenuItem>
                             <MenuItem value='Saved Queries'>Saved Queries</MenuItem>
                         </Select>
                     </FormControl>

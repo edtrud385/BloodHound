@@ -17,12 +17,34 @@ import { QueryScope, SavedQuery } from 'js-client-library';
 import { useMemo } from 'react';
 import { CommonSearches as prebuiltSearchListAGI } from '../../commonSearchesAGI';
 import { CommonSearches as prebuiltSearchListAGT } from '../../commonSearchesAGT';
+import { CommonSearches as prebuiltSearchListSophos } from '../../commonSearchesSophos';
 import { useFeatureFlag } from '../../hooks/useFeatureFlags';
 import { useSavedQueries } from '../../hooks/useSavedQueries';
 import { QueryLineItem } from '../../types';
 import { useSelf } from '../useSelf';
 
-export const usePrebuiltQueries = () => {
+/** Which pre-built queries to list: Sophos review queries, CE's built-in ones, or both (for lookups). */
+export type PrebuiltQuerySet = 'sophos' | 'bloodhound' | 'all';
+
+const QUERY_SET_STORAGE_KEY = 'bh-prebuilt-query-set';
+
+export const getStoredQuerySet = (): Exclude<PrebuiltQuerySet, 'all'> => {
+    try {
+        return localStorage.getItem(QUERY_SET_STORAGE_KEY) === 'bloodhound' ? 'bloodhound' : 'sophos';
+    } catch {
+        return 'sophos';
+    }
+};
+
+export const storeQuerySet = (set: Exclude<PrebuiltQuerySet, 'all'>): void => {
+    try {
+        localStorage.setItem(QUERY_SET_STORAGE_KEY, set);
+    } catch {
+        // storage unavailable (private window): the choice just isn't remembered
+    }
+};
+
+export const usePrebuiltQueries = (querySet: PrebuiltQuerySet = 'all') => {
     const { data: tierFlag } = useFeatureFlag('tier_management_engine');
     const { getSelfId } = useSelf();
     const { data: selfId } = getSelfId;
@@ -50,9 +72,14 @@ export const usePrebuiltQueries = () => {
         queries: userQueries.data || [],
     };
 
-    const queryList = tierFlag?.enabled
-        ? [...prebuiltSearchListAGT, savedQueries]
-        : [...prebuiltSearchListAGI, savedQueries];
+    const bloodhoundList = tierFlag?.enabled ? prebuiltSearchListAGT : prebuiltSearchListAGI;
+    const prebuilt =
+        querySet === 'sophos'
+            ? prebuiltSearchListSophos
+            : querySet === 'bloodhound'
+              ? bloodhoundList
+              : [...prebuiltSearchListSophos, ...bloodhoundList];
+    const queryList = [...prebuilt, savedQueries];
 
     return queryList;
 };

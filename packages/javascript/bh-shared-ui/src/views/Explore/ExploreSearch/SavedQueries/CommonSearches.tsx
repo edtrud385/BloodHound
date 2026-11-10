@@ -16,17 +16,19 @@
 
 import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { TextButton } from 'doodle-ui';
+import { TextButton, ToggleGroup, ToggleGroupItem } from 'doodle-ui';
 import fileDownload from 'js-file-download';
 import { useMemo, useState } from 'react';
 import PrebuiltSearchList from '../../../../components/PrebuiltSearchList';
 import { getExportQuery, useDeleteSavedQuery, usePrebuiltQueries } from '../../../../hooks';
+import { getStoredQuerySet, storeQuerySet } from '../../../../hooks/usePrebuiltQueries';
 import { useSelf } from '../../../../hooks/useSelf';
 import { useNotifications } from '../../../../providers';
 import { QueryLineItem, QueryListSection } from '../../../../types';
 import { cn } from '../../../../utils';
 import { useSavedQueriesContext } from '../../providers';
 import ConfirmDeleteQueryDialog from './ConfirmDeleteQueryDialog';
+import QueryPicker, { fillPickerQuery } from './QueryPicker';
 import QuerySearchFilter from './QuerySearchFilter';
 
 type CommonSearchesProps = {
@@ -55,11 +57,25 @@ const CommonSearches = ({
 
     const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
 
+    // Which pre-built set to list: Sophos review queries or CE's built-in ones (remembered in this browser)
+    const [querySet, setQuerySet] = useState(getStoredQuerySet);
+    const changeQuerySet = (value: string) => {
+        if (value !== 'sophos' && value !== 'bloodhound') return; // clicking the active item sends ''
+        setQuerySet(value);
+        storeQuerySet(value);
+        setCategoryFilter([]);
+    };
+
     //master list of pre-made queries
-    const queryList: QueryListSection[] = usePrebuiltQueries();
-    const allCategories = queryList.map((item) => item.subheader);
+    const queryList: QueryListSection[] = usePrebuiltQueries(querySet);
+    // Only offer the categories of the selected platform (all of them when no platform is picked)
+    const allCategories = queryList
+        .filter((item) => !platform || item.category?.toLowerCase() === platform.toLowerCase())
+        .map((item) => item.subheader);
     const uniqueCategoriesSet = new Set(allCategories);
-    const categories = [...uniqueCategoriesSet].filter((category) => category !== '').sort();
+    const categories = [...uniqueCategoriesSet]
+        .filter((category) => category !== '')
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
     const { getSelfId } = useSelf();
     const { data: selfId } = getSelfId;
@@ -123,7 +139,29 @@ const CommonSearches = ({
         return filteredData;
     }, [queryList, searchTerm, platform, categoryFilter, source, selfId, isFiltered]);
 
+    // Legacy-style picker step for the clicked query, if it has one, and the name chosen in it
+    const [pickedValue, setPickedValue] = useState<string | null>(null);
+    const selectedItem = useMemo(
+        () =>
+            selected.query
+                ? queryList
+                      .flatMap((section) => section.queries)
+                      .find((q) => q.query === selected.query && q.id === selected.id)
+                : undefined,
+        [queryList, selected]
+    );
+    const activePicker = selectedItem?.picker;
+
+    const handlePick = (value: string | null) => {
+        if (!selectedItem || !activePicker) return;
+        setPickedValue(value);
+        const query = value ? fillPickerQuery(activePicker, value) : selectedItem.query;
+        onSetCypherQuery(query);
+        onPerformCypherSearch(query);
+    };
+
     const handleClick = (query: string, id: number | undefined) => {
+        setPickedValue(null);
         if (selected.query === query && selected.id === id) {
             //deselect
             setSelected({ query: '', id: undefined });
@@ -191,6 +229,20 @@ const CommonSearches = ({
             </div>
 
             <div id='common-queries-panel' className={cn({ hidden: !showCommonQueries })}>
+                <ToggleGroup
+                    type='single'
+                    value={querySet}
+                    onValueChange={changeQuerySet}
+                    aria-label='Pre-built query set'
+                    className='w-full mt-2 mb-1'
+                    data-testid='prebuilt-query-set'>
+                    <ToggleGroupItem value='sophos' className='flex-1' aria-label='Sophos review queries'>
+                        Sophos Queries
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value='bloodhound' className='flex-1' aria-label='BloodHound CE built-in queries'>
+                        BloodHound CE
+                    </ToggleGroupItem>
+                </ToggleGroup>
                 <QuerySearchFilter
                     queryFilterHandler={handleFilter}
                     exportHandler={handleExport}
@@ -200,6 +252,14 @@ const CommonSearches = ({
                     platform={platform}
                     categoryFilter={categoryFilter}
                     source={source}></QuerySearchFilter>
+                {activePicker && (
+                    <QueryPicker
+                        key={`${selected.query}-${selected.id}`}
+                        picker={activePicker}
+                        value={pickedValue}
+                        onChange={handlePick}
+                    />
+                )}
             </div>
 
             <div className={cn('grow-1 min-h-0 overflow-auto', { hidden: !showCommonQueries })}>

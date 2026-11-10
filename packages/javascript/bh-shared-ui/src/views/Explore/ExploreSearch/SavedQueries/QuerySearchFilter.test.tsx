@@ -96,7 +96,7 @@ describe('QuerySearchFilter', () => {
 
         const testPlatformAll = screen.getByText('All');
         const testPlatformAD = screen.getByText('Active Directory');
-        const testPlatformAzure = screen.getByText('Azure');
+        const testPlatformAzure = screen.getByText('Entra ID');
         const testPlatformSavedQueries = screen.getByText('Saved Queries');
 
         expect(testPlatformAll).toBeInTheDocument();

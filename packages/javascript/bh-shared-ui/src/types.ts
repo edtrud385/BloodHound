@@ -58,6 +58,19 @@ export type PrimaryNavItem = {
     testId: string;
 };
 
+/**
+ * Legacy-style picker step for a pre-built query: after the query runs for everything, a dropdown offers
+ * the nodes `options` returns, and choosing one runs `query` with `$result` replaced by that node's name.
+ */
+export type QueryPicker = {
+    /** Prompt shown on the dropdown, e.g. "Select a Domain..." */
+    title: string;
+    /** Cypher returning the nodes to choose from; their names become the options. */
+    options: string;
+    /** Cypher run for the chosen node; `$result` is replaced by its name as a quoted string. */
+    query: string;
+};
+
 export type CommonSearchType = {
     subheader: string;
     category: string;
@@ -66,6 +79,7 @@ export type CommonSearchType = {
         description: string;
         query: string;
         id?: number;
+        picker?: QueryPicker;
     }[];
 };
 
@@ -74,6 +88,7 @@ export type QueryLineItem = {
     name: string;
     description: string;
     query: string;
+    picker?: QueryPicker;
     canEdit?: boolean;
     user_id?: string;
 };

@@ -63,6 +63,10 @@ const server = setupServer(
 );
 
 beforeAll(() => server.listen());
+beforeEach(() => {
+    // These tests cover CE's built-in query list; the Sophos set has its own test below
+    localStorage.setItem('bh-prebuilt-query-set', 'bloodhound');
+});
 afterEach(() => {
     server.resetHandlers();
     vi.restoreAllMocks();
@@ -226,5 +230,28 @@ describe('CommonSearches', () => {
         expect(handleToggle).toBeCalled();
         expect(handleToggle).toBeCalledTimes(1);
         expect(screen.getByText(/chevron-down/i)).toBeInTheDocument();
+    });
+    it('shows the Sophos review queries by default and switches to the CE built-in queries', async () => {
+        localStorage.removeItem('bh-prebuilt-query-set');
+        const user = userEvent.setup();
+        const screen = render(
+            <QueryClientProvider client={queryClient}>
+                <CommonSearches
+                    onSetCypherQuery={vi.fn()}
+                    onPerformCypherSearch={vi.fn()}
+                    onToggleCommonQueries={vi.fn()}
+                    showCommonQueries={true}
+                />
+            </QueryClientProvider>
+        );
+
+        // CE's own queries are hidden while the Sophos set is shown (the public repo ships that set empty)
+        expect(screen.getByRole('radio', { name: /Sophos review queries/i })).toHaveAttribute('data-state', 'on');
+        expect(screen.queryByText(/all domain admins/i)).toBeNull();
+
+        await user.click(screen.getByRole('radio', { name: /BloodHound CE built-in queries/i }));
+
+        expect(screen.getByText(/all domain admins/i)).toBeInTheDocument();
+        expect(localStorage.getItem('bh-prebuilt-query-set')).toBe('bloodhound');
     });
 });
