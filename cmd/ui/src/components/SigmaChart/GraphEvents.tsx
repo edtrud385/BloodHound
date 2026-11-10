@@ -17,7 +17,16 @@
 import { useRegisterEvents, useSetSettings, useSigma } from '@react-sigma/core';
 import { useTheme } from 'bh-shared-ui';
 import type { Attributes } from 'graphology-types';
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useState } from 'react';
+import {
+    forwardRef,
+    useCallback,
+    useEffect,
+    useImperativeHandle,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import type { SigmaNodeEventPayload } from 'sigma/sigma';
 import type { Coordinates } from 'sigma/types';
 import {
@@ -30,7 +39,13 @@ import {
     graphToFramedGraph,
     resetCamera,
 } from 'src/ducks/graph/utils';
-import { LABEL_DECLUTTER_RATIO, getDeclutteredLabels, getLabelScale, getNodeSizeBoost } from 'src/rendering/legacyView';
+import {
+    LABEL_DECLUTTER_RATIO,
+    drawCollapsedBadges,
+    getDeclutteredLabels,
+    getLabelScale,
+    getNodeSizeBoost,
+} from 'src/rendering/legacyView';
 import { bezier } from 'src/rendering/utils/bezier';
 import { blendHexColors, getNodeRadius } from 'src/rendering/utils/utils';
 import { useAppSelector } from 'src/store';
@@ -40,6 +55,7 @@ import { getFullPathHighlightedEntities, getIsHighlightedItemInGraph } from './u
 
 interface SigmaChartRef {
     resetCamera: () => void;
+    refresh: () => void;
     zoomTo: (id: string) => void;
     runSequentialLayout: () => void;
     runStandardLayout: () => void;
@@ -48,6 +64,7 @@ interface SigmaChartRef {
 interface GraphEventProps {
     highlightedItem: string | null;
     onClickNode?: (id: string) => void;
+    onDoubleClickNode?: (id: string) => void;
     onClickStage?: () => void;
     onRightClickNode?: (event: SigmaNodeEventPayload) => void;
     showNodeLabels?: boolean;
@@ -86,6 +103,7 @@ export const GraphEvents = forwardRef(function GraphEvents(
     {
         highlightedItem,
         onClickNode,
+        onDoubleClickNode,
         onClickStage,
         onRightClickNode,
         showNodeLabels = true,
@@ -108,8 +126,27 @@ export const GraphEvents = forwardRef(function GraphEvents(
     const registerEvents = useRegisterEvents();
     const setSettings = useSetSettings();
 
-    const [draggedMeta, setDraggedMeta] = useState<DragMetadata>(DEFAULT_DRAGGED_META);
-    const draggedNode = draggedMeta.id && graph.getNodeAttributes(draggedMeta.id);
+    // Drag state lives in a ref, not React state: event handlers must see the current drag at once.
+    // With state, a fast click could reach a stale mouseup handler that thought nothing was dragged,
+    // leaving the drag active so the next node under the cursor followed the mouse.
+    const dragRef = useRef<DragMetadata>(DEFAULT_DRAGGED_META);
+    // Only used to pause edge labels while a node is actually being moved
+    const [isDragging, setIsDragging] = useState(false);
+
+    const endDrag = useCallback(() => {
+        if (!dragRef.current.id) return;
+        // Keep cancelNextClick until the click event that follows this mouseup has been handled
+        const cancelNextClick = dragRef.current.cancelNextClick;
+        dragRef.current = { ...DEFAULT_DRAGGED_META, cancelNextClick };
+        setIsDragging(false);
+        setTimeout(() => (dragRef.current = { ...dragRef.current, cancelNextClick: false }), 0);
+    }, []);
+
+    // Mouse released outside the graph canvas must also end a drag
+    useEffect(() => {
+        window.addEventListener('mouseup', endDrag);
+        return () => window.removeEventListener('mouseup', endDrag);
+    }, [endDrag]);
 
     const sigmaChartRef = ref as React.MutableRefObject<SigmaChartRef | null>;
 
@@ -137,6 +174,7 @@ export const GraphEvents = forwardRef(function GraphEvents(
             resetCamera: () => {
                 resetCamera(sigma);
             },
+            refresh: () => sigma.refresh(),
 
             runSequentialLayout: () => {
                 const { width, height } = sigma.getDimensions();
@@ -206,22 +244,18 @@ export const GraphEvents = forwardRef(function GraphEvents(
             downNode: (event) => {
                 if (event.event.original.button === MOUSE_BUTTON_PRIMARY) {
                     const node = graph.getNodeAttributes(event.node);
-                    setDraggedMeta({
+                    dragRef.current = {
                         cancelNextClick: false,
                         id: event.node,
                         offset: getNodeOffset(node, sigma.viewportToGraph(event.event)),
                         origin: { x: node.x, y: node.y },
-                    });
+                    };
                 }
             },
-            mouseup: () => {
-                if (draggedNode) {
-                    // Timeout prevents state update race conditions between this an mousemovebody.
-                    setTimeout(() => setDraggedMeta(DEFAULT_DRAGGED_META), 10);
-                }
-            },
+            mouseup: endDrag,
             mousemovebody: (event) => {
-                if (draggedNode && draggedMeta.offset) {
+                const draggedMeta = dragRef.current;
+                if (draggedMeta.id && draggedMeta.offset && graph.hasNode(draggedMeta.id)) {
                     // Get new position of node
                     const position = sigma.viewportToGraph(event);
 
@@ -238,7 +272,8 @@ export const GraphEvents = forwardRef(function GraphEvents(
                     if (!draggedMeta.cancelNextClick && draggedMeta.origin) {
                         const dragDistance = getDistanceBetween(draggedMeta.origin, newPosition);
                         if (dragDistance > DRAG_THRESHOLD) {
-                            setDraggedMeta({ ...draggedMeta, cancelNextClick: true });
+                            dragRef.current = { ...draggedMeta, cancelNextClick: true };
+                            setIsDragging(true);
                         }
                     }
 
@@ -249,15 +284,16 @@ export const GraphEvents = forwardRef(function GraphEvents(
             doubleClickNode: (event) => {
                 // Prevent zoom when node is double clicked
                 preventAllDefaults(event);
+                onDoubleClickNode?.(event.node);
             },
             doubleClick: (event) => {
                 // Prevent zoom when graph is double clicked
                 preventAllDefaults(event);
             },
             clickNode: (event) => {
-                if (draggedMeta.cancelNextClick) {
-                    // Click handler is skipped, canceling the click. State is unset
-                    setDraggedMeta({ ...draggedMeta, cancelNextClick: false });
+                if (dragRef.current.cancelNextClick) {
+                    // The node was dragged: skip the click so it is not selected
+                    dragRef.current = { ...dragRef.current, cancelNextClick: false };
                 } else {
                     onClickNode?.(event.node);
                 }
@@ -272,12 +308,10 @@ export const GraphEvents = forwardRef(function GraphEvents(
             clickStage: () => onClickStage?.(),
         });
     }, [
-        draggedMeta,
-        draggedMeta.id,
-        draggedMeta.offset,
-        draggedNode,
+        endDrag,
         graph,
         onClickNode,
+        onDoubleClickNode,
         onClickStage,
         onRightClickNode,
         registerEvents,
@@ -386,10 +420,19 @@ export const GraphEvents = forwardRef(function GraphEvents(
         isExploreGraphLabelClip,
     ]);
 
+    // Legacy view: draw the count bubble on nodes with collapsed leaves after every render
+    useEffect(() => {
+        const draw = () => drawCollapsedBadges(sigma);
+        sigma.on('afterRender', draw);
+        return () => {
+            sigma.removeListener('afterRender', draw);
+        };
+    }, [sigma]);
+
     // Toggle off edge labels when dragging a node to avoid performance hit
     useLayoutEffect(() => {
-        setSettings({ renderEdgeLabels: draggedNode ? false : showEdgeLabels });
-    }, [draggedNode, setSettings, showEdgeLabels]);
+        setSettings({ renderEdgeLabels: isDragging ? false : showEdgeLabels });
+    }, [isDragging, setSettings, showEdgeLabels]);
 
     useLayoutEffect(() => {
         if (sigmaChartRef?.current) {

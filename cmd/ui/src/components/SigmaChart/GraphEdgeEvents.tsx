@@ -62,6 +62,8 @@ export const GraphEdgeEvents: FC<GraphEdgeEventProps> = ({ onClickEdge }) => {
                     if (nodeDisplayData === null) continue;
 
                     const { source, target } = nodeDisplayData;
+                    // Edges to hidden nodes (e.g. collapsed leaves) are not drawn, so they must not be clickable
+                    if (source.hidden || target.hidden) continue;
                     const sourceCoordinates = { x: source.x, y: source.y };
                     const targetCoordinates = { x: target.x, y: target.y };
                     const sourceCoordinatesViewport = sigma.framedGraphToViewport(sourceCoordinates);
