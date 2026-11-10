@@ -189,16 +189,16 @@ export const expandCollapsed = (graph: MultiDirectedGraph, node: string): string
 export const getExpandedCount = (attrs: Attributes): number =>
     (attrs.expandedMembers as string[] | undefined)?.length ?? 0;
 
-/** Rows per column when expanded leaves are laid out next to their parent. */
-const EXPAND_ROW_SPACING = 70;
-const EXPAND_COLUMN_SPACING = 320;
+/** Spacing for leaves expanded in place: one column beside the parent, like a dagre rank. */
+const EXPAND_ROW_SPACING = 100;
 const EXPAND_OFFSET = 500;
 
 /**
  * Expand the leaves folded into `node` without touching the rest of the layout: every other node
- * stays where it is and the leaves are placed in a block beside their parent (left of it when they
- * point at it, right of it when it points at them, matching the left-to-right flow). The parent
- * remembers them so they can be folded back with `recollapse`. Returns the ids that were revealed.
+ * stays where it is and the leaves are placed in one column beside their parent, centred on it (left
+ * of it when they point at it, right of it when it points at them, matching the left-to-right flow),
+ * the same way the layout itself would rank them. The parent remembers them so they can be folded
+ * back with `recollapse`. Returns the ids that were revealed.
  */
 export const expandInPlace = (graph: MultiDirectedGraph, node: string): string[] => {
     if (!graph.hasNode(node)) return [];
@@ -210,16 +210,9 @@ export const expandInPlace = (graph: MultiDirectedGraph, node: string): string[]
     const outgoing = members.filter((member) => !graph.hasEdge(member, node));
 
     const place = (group: string[], side: -1 | 1) => {
-        if (!group.length) return;
-        // Roughly 5 rows per column keeps the block about as tall as it is wide once labels are counted
-        const rows = Math.min(group.length, Math.max(1, Math.ceil(Math.sqrt(group.length * 5))));
-        const columns = Math.ceil(group.length / rows);
         group.forEach((member, i) => {
-            const column = Math.floor(i / rows);
-            const row = i % rows;
-            const rowsInColumn = column === columns - 1 ? group.length - column * rows : rows;
-            graph.setNodeAttribute(member, 'x', px + side * (EXPAND_OFFSET + column * EXPAND_COLUMN_SPACING));
-            graph.setNodeAttribute(member, 'y', py + (row - (rowsInColumn - 1) / 2) * EXPAND_ROW_SPACING);
+            graph.setNodeAttribute(member, 'x', px + side * EXPAND_OFFSET);
+            graph.setNodeAttribute(member, 'y', py + (i - (group.length - 1) / 2) * EXPAND_ROW_SPACING);
         });
     };
     place(incoming, -1);
