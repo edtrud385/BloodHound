@@ -83,6 +83,7 @@ import { initGraph } from 'src/views/Explore/utils';
 import ContextMenu from './ContextMenu/ContextMenu';
 import EdgeFilterPanel from './EdgeFilterPanel';
 import ExploreSearch from './ExploreSearch/ExploreSearch';
+import { usePngExport } from './PngExportDialog';
 import { transformIconDictionary } from './svgIcons';
 
 /** Legacy view: one icon button in the graph controls row, styled like CE's own controls */
@@ -140,6 +141,7 @@ const GraphView: FC = () => {
     const [contextMenu, setContextMenu] = useState<{ mouseX: number; mouseY: number } | null>(null);
 
     const sigmaChartRef = useRef<any>(null);
+    const pngExport = usePngExport(useCallback(() => sigmaChartRef.current?.captureImage(), []));
 
     const darkMode = useAppSelector((state) => state.global.view.darkMode);
     const exploreLayout = useAppSelector((state) => state.global.view.exploreLayout);
@@ -444,6 +446,10 @@ const GraphView: FC = () => {
                         showEdgeLabels={showEdgeLabels}
                         onToggleEdgeLabels={toggleShowEdgeLabels}
                         jsonData={graphQuery.data}
+                        additionalExportActions={[
+                            { id: 'png', label: 'PNG', onSelect: pngExport.save, disabled: displayTable },
+                            { id: 'png-options', label: 'PNG options…', onSelect: pngExport.openOptions },
+                        ]}
                         onReset={() => sigmaChartRef.current?.resetCamera()}
                         currentNodes={graphQuery.data?.nodes}
                         onSearchedNodeClick={(node) => {
@@ -486,6 +492,7 @@ const GraphView: FC = () => {
                 </div>
             </div>
             <GraphItemInformationPanel />
+            {pngExport.dialog}
             <EdgeFilterPanel
                 anchorEl={edgeFilterAnchor}
                 onClose={() => setEdgeFilterAnchor(null)}

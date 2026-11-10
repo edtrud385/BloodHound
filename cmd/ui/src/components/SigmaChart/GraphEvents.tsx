@@ -58,9 +58,20 @@ import { preventAllDefaults } from 'src/utils';
 import { sequentialLayout, standardLayout } from 'src/views/Explore/utils';
 import { getFullPathHighlightedEntities, getIsHighlightedItemInGraph } from './utils';
 
+/** The first non-transparent background behind the graph, so the PNG matches the screen (light or dark). */
+const getGraphBackground = (element: HTMLElement | null): string => {
+    for (let el = element; el; el = el.parentElement) {
+        const color = getComputedStyle(el).backgroundColor;
+        if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) return color;
+    }
+    return '#ffffff';
+};
+
 interface SigmaChartRef {
     resetCamera: () => void;
     refresh: () => void;
+    /** The graph as it is on screen, flattened onto its background (for Export > PNG). */
+    captureImage: () => HTMLCanvasElement;
     /** The part of the graph currently on screen, in graph coordinates. */
     getViewBounds: () => ViewBounds;
     zoomTo: (id: string) => void;
@@ -182,6 +193,20 @@ export const GraphEvents = forwardRef(function GraphEvents(
                 resetCamera(sigma);
             },
             refresh: () => sigma.refresh(),
+            captureImage: () => {
+                // Redraw now so the WebGL buffers still hold this frame while they are copied
+                sigma.refresh();
+                const layers = Object.entries(sigma.getCanvases()).filter(([id]) => id !== 'mouse');
+                const first = layers[0]?.[1];
+                const out = document.createElement('canvas');
+                out.width = first?.width ?? 0;
+                out.height = first?.height ?? 0;
+                const context = out.getContext('2d')!;
+                context.fillStyle = getGraphBackground(sigma.getContainer());
+                context.fillRect(0, 0, out.width, out.height);
+                layers.forEach(([, canvas]) => context.drawImage(canvas, 0, 0, out.width, out.height));
+                return out;
+            },
             getViewBounds: () => {
                 const { width, height } = sigma.getDimensions();
                 // The entity panel sits over the right of the graph; don't count the area behind it
