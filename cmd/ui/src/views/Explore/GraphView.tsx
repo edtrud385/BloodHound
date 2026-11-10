@@ -71,7 +71,6 @@ import {
     LABEL_SIZE_MIN,
     LABEL_SIZE_STEP,
     expandCollapsed,
-    expandInPlace,
     findCollapsedParent,
     getCollapsedCount,
     getExpandedCount,
@@ -192,14 +191,29 @@ const GraphView: FC = () => {
         }
     }, [graphQuery.data, graphOptions]);
 
-    /* Legacy view: expand the leaves folded into a node (count bubble) and re-run the current layout */
+    /* Legacy view: re-run the current layout and refit, so expanded or folded nodes settle into the columns */
+    const relayout = useCallback(() => {
+        if (exploreLayout === 'standard') sigmaChartRef.current?.runStandardLayout();
+        else sigmaChartRef.current?.runSequentialLayout();
+    }, [exploreLayout]);
+
+    /* Legacy view: expand the leaves folded into a node (count bubble), then re-layout and refit */
     const expandCollapsedNode = useCallback(
         (node: string) => {
             if (!graphologyGraph || !expandCollapsed(graphologyGraph, node).length) return;
-            if (exploreLayout === 'standard') sigmaChartRef.current?.runStandardLayout();
-            else sigmaChartRef.current?.runSequentialLayout();
+            relayout();
         },
-        [graphologyGraph, exploreLayout]
+        [graphologyGraph, relayout]
+    );
+
+    /* Legacy view: fold expanded leaves back into the count bubble, then re-layout and refit */
+    const recollapseNode = useCallback(
+        (node: string) => {
+            if (!graphologyGraph) return;
+            recollapse(graphologyGraph, node);
+            relayout();
+        },
+        [graphologyGraph, relayout]
     );
 
     // If the selected node is folded into a count bubble (e.g. picked from search), unfold it so it is visible
@@ -224,8 +238,7 @@ const GraphView: FC = () => {
                   <MenuItem
                       key='legacy-expand'
                       onClick={() => {
-                          expandInPlace(graphologyGraph!, contextMenuNode, sigmaChartRef.current?.getViewBounds());
-                          sigmaChartRef.current?.refresh();
+                          expandCollapsedNode(contextMenuNode);
                       }}>
                       Expand {contextMenuCollapsedCount} collapsed nodes
                   </MenuItem>
@@ -234,8 +247,7 @@ const GraphView: FC = () => {
                   <MenuItem
                       key='legacy-collapse'
                       onClick={() => {
-                          recollapse(graphologyGraph!, contextMenuNode);
-                          sigmaChartRef.current?.refresh();
+                          recollapseNode(contextMenuNode);
                       }}>
                       Collapse {contextMenuExpandedCount} nodes
                   </MenuItem>
