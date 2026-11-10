@@ -64,6 +64,16 @@ export const NODE_LABEL_BACKGROUND = false;
 /** Draw edge labels rotated along the edge with no background box, like Legacy, instead of CE's boxed labels. */
 export const EDGE_LABEL_ALONG_EDGE = true;
 
+/** Icons are drawn at this fraction of CE's size so names stand out, like Legacy (labels keep their size). */
+export const NODE_ICON_SCALE = 0.6;
+
+/** Legacy-style tapered edges: width at the source end and at the target end, relative to CE's width. */
+export const EDGE_TAPER_START = 1.6;
+export const EDGE_TAPER_END = 0.45;
+
+/** Edge width multiplier at `t` along the edge (0 = source, 1 = target). */
+export const edgeTaper = (t: number): number => EDGE_TAPER_START + (EDGE_TAPER_END - EDGE_TAPER_START) * t;
+
 /** Labels never render smaller than this fraction of their full-size font (12px * 0.85 ≈ 10px). */
 export const LABEL_MIN_SCALE = 0.85;
 
@@ -207,7 +217,7 @@ const EXPAND_MIN_OFFSET = 500;
  */
 export const expandInPlace = (graph: MultiDirectedGraph, node: string, view?: ViewBounds): string[] => {
     if (!graph.hasNode(node)) return [];
-    const { x: px, y: py } = graph.getNodeAttributes(node);
+    const { x: parentX, y: parentY } = graph.getNodeAttributes(node);
     const members = expandCollapsed(graph, node).filter((member) => graph.hasNode(member));
     if (!members.length) return [];
 
@@ -217,15 +227,27 @@ export const expandInPlace = (graph: MultiDirectedGraph, node: string, view?: Vi
     const viewWidth = view ? view.xMax - view.xMin : 0;
     const viewHeight = view ? view.yMax - view.yMin : 0;
 
+    // When the parent is the only other node on screen, move it to the screen's edge so its fan can use
+    // the whole width (Legacy-style); otherwise leave every existing node where it is.
+    let px = parentX;
+    let py = parentY;
+    const othersVisible = graph.someNode((n, attrs) => n !== node && !attrs.hidden && !members.includes(n));
+    if (view && !othersVisible && (incoming.length === 0 || outgoing.length === 0)) {
+        px = outgoing.length ? view.xMin + viewWidth * 0.1 : view.xMax - viewWidth * 0.1;
+        py = (view.yMin + view.yMax) / 2;
+        graph.setNodeAttribute(node, 'x', px);
+        graph.setNodeAttribute(node, 'y', py);
+    }
+
     const place = (group: string[], side: -1 | 1) => {
         if (!group.length) return;
 
-        // Horizontal: well out from the parent (about 40% of the screen), but short of the screen edge
+        // Horizontal: as far out as the screen allows, leaving room for the names
         let offset = EXPAND_MIN_OFFSET;
         if (view) {
             const room = side === 1 ? view.xMax - px : px - view.xMin;
             const edgeMargin = viewWidth * 0.12;
-            offset = room > edgeMargin * 1.5 ? Math.min(viewWidth * 0.4, room - edgeMargin) : viewWidth * 0.4;
+            offset = room > edgeMargin * 2 ? room - edgeMargin : viewWidth * 0.4;
         }
         const x = px + side * offset;
 

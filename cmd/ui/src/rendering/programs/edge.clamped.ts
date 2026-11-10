@@ -20,6 +20,7 @@ import vertexShaderSource from 'sigma/rendering/webgl/shaders/edge.clamped.vert.
 import fragmentShaderSource from 'sigma/rendering/webgl/shaders/edge.frag.glsl';
 import { EdgeDisplayData, NodeDisplayData } from 'sigma/types';
 import { canUse32BitsIndices, floatColor } from 'sigma/utils';
+import { edgeTaper } from 'src/rendering/legacyView';
 import { getNodeRadius } from 'src/rendering/utils/utils';
 
 const POINTS = 4,
@@ -158,6 +159,12 @@ export default class EdgeClampedProgram extends AbstractEdgeProgram {
             n2 = dx * len * thickness;
         }
 
+        // Legacy view: taper from a wider source end to a narrower target end
+        const s1 = n1 * edgeTaper(0),
+            s2 = n2 * edgeTaper(0),
+            t1 = n1 * edgeTaper(1),
+            t2 = n2 * edgeTaper(1);
+
         let i = POINTS * ATTRIBUTES * offset;
 
         const array = this.array;
@@ -165,32 +172,32 @@ export default class EdgeClampedProgram extends AbstractEdgeProgram {
         // First point
         array[i++] = x1;
         array[i++] = y1;
-        array[i++] = n1;
-        array[i++] = n2;
+        array[i++] = s1;
+        array[i++] = s2;
         array[i++] = color;
         array[i++] = 0;
 
         // First point flipped
         array[i++] = x1;
         array[i++] = y1;
-        array[i++] = -n1;
-        array[i++] = -n2;
+        array[i++] = -s1;
+        array[i++] = -s2;
         array[i++] = color;
         array[i++] = 0;
 
         // Second point
         array[i++] = x2;
         array[i++] = y2;
-        array[i++] = n1;
-        array[i++] = n2;
+        array[i++] = t1;
+        array[i++] = t2;
         array[i++] = color;
         array[i++] = radius;
 
         // Second point flipped
         array[i++] = x2;
         array[i++] = y2;
-        array[i++] = -n1;
-        array[i++] = -n2;
+        array[i++] = -t1;
+        array[i++] = -t2;
         array[i++] = color;
         array[i] = -radius;
     }

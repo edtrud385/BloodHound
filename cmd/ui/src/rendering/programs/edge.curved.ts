@@ -28,6 +28,7 @@ import { AbstractEdgeProgram } from 'sigma/rendering/webgl/programs/common/edge'
 import { RenderParams } from 'sigma/rendering/webgl/programs/common/program';
 import { NodeDisplayData } from 'sigma/types';
 import { canUse32BitsIndices, floatColor } from 'sigma/utils';
+import { edgeTaper } from 'src/rendering/legacyView';
 import { CurvedEdgeDisplayData } from 'src/rendering/programs/edge.curvedArrow';
 import { fragmentShaderSource } from 'src/rendering/shaders/edge.curved.frag';
 import { vertexShaderSource } from 'src/rendering/shaders/edge.curved.vert';
@@ -229,9 +230,11 @@ export default class CurvedEdgeProgram extends AbstractEdgeProgram {
                 normal = bezier.getMidpoint(firstNormal, secondNormal);
             }
 
+            // Legacy view: taper from a wider source end to a narrower target end
+            const taperedThickness = thickness * edgeTaper(points.length > 1 ? j / (points.length - 1) : 0);
             const vOffset = {
-                x: normal.x * thickness,
-                y: -normal.y * thickness,
+                x: normal.x * taperedThickness,
+                y: -normal.y * taperedThickness,
             };
 
             // First point
@@ -261,8 +264,8 @@ export default class CurvedEdgeProgram extends AbstractEdgeProgram {
             if (finalPoint.x !== previousPoint.x || finalPoint.y !== previousPoint.y) {
                 const finalNormal = bezier.getNormals(previousPoint, finalPoint);
                 const vOffset = {
-                    x: finalNormal.x * thickness,
-                    y: -finalNormal.y * thickness,
+                    x: finalNormal.x * thickness * edgeTaper(1),
+                    y: -finalNormal.y * thickness * edgeTaper(1),
                 };
                 // First point
                 array[i++] = finalPoint.x;

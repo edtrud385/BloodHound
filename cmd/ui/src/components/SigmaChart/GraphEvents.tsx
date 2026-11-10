@@ -41,6 +41,7 @@ import {
 } from 'src/ducks/graph/utils';
 import {
     LABEL_DECLUTTER_RATIO,
+    NODE_ICON_SCALE,
     ViewBounds,
     drawCollapsedBadges,
     getDeclutteredLabels,
@@ -387,7 +388,7 @@ export const GraphEvents = forwardRef(function GraphEvents(
                 return {
                     ...data,
                     // Legacy view: keep a minimum on-screen node size and a readable label size when zoomed out
-                    size: (data.size ?? 0) * getNodeSizeBoost(camera.ratio),
+                    size: (data.size ?? 0) * getNodeSizeBoost(camera.ratio) * NODE_ICON_SCALE,
                     labelScale: getLabelScale(inverseSqrtZoomRatio),
                     forceLabel:
                         data.forceLabel &&
