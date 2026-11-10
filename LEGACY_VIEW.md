@@ -44,6 +44,10 @@ This UI expects a CE 9.x server. Against CE 8.x the node panel and the right-cli
 because 8.x has no `/api/v2/nodes/{id}` endpoint. Graphs still draw: 8.x sends edges without ids, and
 the UI falls back to a source/kind/target key for them.
 
+## Saved queries open by default
+
+Opening the Cypher tab always shows the saved queries expanded; the toggle still collapses them for that visit.
+
 ## Reachable Tier Zero Targets
 
 Legacy's **Reachable High Value Targets** is back in the node panel, under Object Information and above Sessions.
