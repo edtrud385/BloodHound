@@ -49,6 +49,12 @@ export const LABEL_DECLUTTER_RATIO = 2;
 /** Draw CE's second label line ("Active Directory | User") under each node. Legacy shows the name only. */
 export const SHOW_NODE_SUBLABELS = false;
 
+/** Draw CE's white box behind node labels. Legacy draws the text straight on the canvas. */
+export const NODE_LABEL_BACKGROUND = false;
+
+/** Draw edge labels rotated along the edge with no background box, like Legacy, instead of CE's boxed labels. */
+export const EDGE_LABEL_ALONG_EDGE = true;
+
 /** Labels never render smaller than this fraction of their full-size font (12px * 0.85 ≈ 10px). */
 export const LABEL_MIN_SCALE = 0.85;
 
@@ -148,27 +154,28 @@ export const collapseLeaves = (graph: MultiDirectedGraph, threshold = COLLAPSE_T
 /** Expand a group node back into its members. Returns the ids that were revealed. */
 export const expandGroup = (graph: MultiDirectedGraph, groupId: string): string[] => {
     if (!graph.hasNode(groupId)) return [];
+    if (graph.getNodeAttribute(groupId, 'expanded')) return [];
     const members: string[] = graph.getNodeAttribute(groupId, 'collapsedMembers') ?? [];
     members.forEach((member) => graph.hasNode(member) && graph.setNodeAttribute(member, 'hidden', false));
-    graph.dropNode(groupId);
+    // Hide rather than drop: the group is usually the hovered node when clicked, and sigma 2
+    // dereferences its hovered node on the next mouse move, which crashes if the node is gone.
+    graph.mergeNodeAttributes(groupId, { hidden: true, expanded: true });
     return members;
-};
-
-/** Expand every group in the graph. */
-export const expandAllGroups = (graph: MultiDirectedGraph): void => {
-    graph.filterNodes((node) => isGroupNode(node)).forEach((node) => expandGroup(graph, node));
 };
 
 /** Find the group node that currently hides `nodeId`, if any. */
 export const findGroupContaining = (graph: MultiDirectedGraph, nodeId: string): string | undefined =>
     graph.findNode(
-        (node, attrs) => isGroupNode(node) && ((attrs.collapsedMembers as string[] | undefined) ?? []).includes(nodeId)
+        (node, attrs) =>
+            isGroupNode(node) &&
+            !attrs.expanded &&
+            ((attrs.collapsedMembers as string[] | undefined) ?? []).includes(nodeId)
     );
 
 /** Park hidden members on their group node so they don't distort extents or later layouts. */
 export const syncHiddenPositions = (graph: MultiDirectedGraph): void => {
     graph.forEachNode((node, attrs) => {
-        if (!isGroupNode(node)) return;
+        if (!isGroupNode(node) || attrs.expanded) return;
         (attrs.collapsedMembers as string[]).forEach((member) => {
             if (!graph.hasNode(member)) return;
             graph.setNodeAttribute(member, 'x', attrs.x);
@@ -223,9 +230,13 @@ export const stretchToAspect = (graph: MultiDirectedGraph, aspect: number): void
     });
 };
 
-/** Screen-space cell (px) that may hold one label when zoomed out. */
-const DECLUTTER_CELL_WIDTH = 170;
-const DECLUTTER_CELL_HEIGHT = 36;
+/**
+ * Screen-space cell (px) that may hold one label when zoomed out. Small on purpose: labels are
+ * only dropped where they would pile almost exactly on top of each other, so nearly every name
+ * stays on screen (Legacy shows all of them, overlapping).
+ */
+const DECLUTTER_CELL_WIDTH = 100;
+const DECLUTTER_CELL_HEIGHT = 5;
 
 const declutterCache = new WeakMap<object, { key: string; labels: Set<string> }>();
 

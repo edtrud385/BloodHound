@@ -474,6 +474,11 @@ export default function getNodeCombinedProgram(): typeof AbstractNodeCombinedPro
             gl.uniform1f(this.sqrtZoomRatioLocation, Math.sqrt(params.ratio));
             //gl.uniform1f(this.sqrtZoomRatioLocation, params.ratio);
             gl.uniformMatrix3fv(this.matrixLocation, false, params.matrix);
+            // Bind this program's own atlas. Each WebGL context hosts several node programs with separate
+            // textures; without this, a program draws with whichever texture was bound last (icons vanish
+            // on hover/selection, or show the wrong icon).
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, this.texture);
             gl.uniform1i(this.atlasLocation, 0);
 
             gl.drawArrays(gl.TRIANGLES, 0, this.array.length / ATTRIBUTES);

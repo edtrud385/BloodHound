@@ -577,6 +577,10 @@ export default function getNodeGlyphsProgram(): typeof AbstractNodeGlyphsProgram
             gl.uniform1f(this.sqrtZoomRatioLocation, Math.sqrt(params.ratio));
             //gl.uniform1f(this.sqrtZoomRatioLocation, params.ratio);
             gl.uniformMatrix3fv(this.matrixLocation, false, params.matrix);
+            // Bind this program's own atlas before drawing (see node.combined.ts): otherwise the texture
+            // last bound on this unit in this WebGL context is used, and icons vanish on hover/selection.
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, this.texture);
             gl.uniform1i(this.atlasLocation, 1);
 
             gl.drawArrays(gl.TRIANGLES, 0, this.array.length / ATTRIBUTES);

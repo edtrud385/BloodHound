@@ -26,7 +26,8 @@ import { Settings } from 'sigma/settings';
 import { Coordinates, NodeDisplayData, PartialButFor } from 'sigma/types';
 import { EdgeDistanceProperties, calculateEdgeDistanceForLabel } from 'src/ducks/graph/utils';
 import { bezier } from 'src/rendering/utils/bezier';
-import { GraphItemData } from '../utils/utils';
+import { EDGE_LABEL_ALONG_EDGE, LABEL_MIN_SCALE } from '../legacyView';
+import { GraphItemData, calculateLabelOpacity } from '../utils/utils';
 import { getControlPointsFromGroupSize } from './edge.self';
 import drawLabel from './node-label';
 
@@ -114,8 +115,67 @@ export default function draw(
     const edgeDistance = calculateEdgeDistanceForLabel(sourceData, targetData);
     const startingPoint = getStartingPoint(edgeData, sourceData, targetData, edgeDistance);
 
-    // Overwrite edge positions with custom-calculated position since non-default edge renderer is used
-    const newData = { ...edgeData, ...startingPoint } as GraphItemData;
+    if (!EDGE_LABEL_ALONG_EDGE) {
+        // Overwrite edge positions with custom-calculated position since non-default edge renderer is used
+        const newData = { ...edgeData, ...startingPoint } as GraphItemData;
+        drawLabel(context, newData, settings);
+        return;
+    }
 
-    drawLabel(context, newData, settings);
+    drawLabelAlongEdge(context, edgeData, sourceData, targetData, startingPoint, settings);
 }
+
+/**
+ * Legacy view: draw the label rotated to follow the edge, sitting just above the line, with no
+ * background box. Curved edges use the tangent at the midpoint (parallel to source -> target for a
+ * quadratic curve); self edges stay horizontal. Text is flipped when needed so it never reads upside down.
+ */
+const drawLabelAlongEdge = (
+    context: CanvasRenderingContext2D,
+    edgeData: Attributes,
+    sourceData: PartialButFor<NodeDisplayData, 'x' | 'y' | 'size'>,
+    targetData: PartialButFor<NodeDisplayData, 'x' | 'y' | 'size'>,
+    point: Coordinates,
+    settings: Settings
+): void => {
+    const inverseSqrtZoomRatio = edgeData.inverseSqrtZoomRatio || 1;
+    // Same readable floor as node labels: never smaller than LABEL_MIN_SCALE, never faded out
+    const labelScale = Math.max(inverseSqrtZoomRatio, LABEL_MIN_SCALE);
+    const opacity = calculateLabelOpacity(labelScale);
+    if (opacity <= 0) return;
+
+    const size = settings.edgeLabelSize * labelScale;
+    context.font = `${settings.edgeLabelWeight} ${size}px ${settings.edgeLabelFont}`;
+
+    const label: string = edgeData.label;
+    const isSelf = edgeData.type === 'self';
+    const dx = targetData.x - sourceData.x;
+    const dy = targetData.y - sourceData.y;
+    const length = Math.hypot(dx, dy);
+
+    // Skip labels that would not fit between the two nodes (Legacy does the same).
+    // Display sizes here are pre-scaled by sigma, so the on-screen radius is size * inverseSqrtZoomRatio.
+    if (
+        !isSelf &&
+        context.measureText(label).width > length - (sourceData.size + targetData.size) * inverseSqrtZoomRatio
+    )
+        return;
+
+    let angle = isSelf ? 0 : Math.atan2(dy, dx);
+    if (angle > Math.PI / 2) angle -= Math.PI;
+    if (angle < -Math.PI / 2) angle += Math.PI;
+
+    const dimFactor = edgeData.isDimmed ? edgeData.labelDimFactor ?? 0.1 : 1;
+
+    context.save();
+    context.translate(point.x, point.y);
+    context.rotate(angle);
+    context.globalAlpha = opacity * dimFactor;
+    context.fillStyle = edgeData.highlighted
+        ? edgeData.highlightedBackground ?? edgeData.labelColor
+        : edgeData.labelColor ?? settings.edgeLabelColor.color ?? '#000';
+    context.textAlign = 'center';
+    context.textBaseline = 'bottom';
+    context.fillText(label, 0, -((edgeData.size ?? 1) / 2 + 1) * inverseSqrtZoomRatio);
+    context.restore();
+};
