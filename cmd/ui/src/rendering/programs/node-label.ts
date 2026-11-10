@@ -16,7 +16,7 @@
 
 import { truncateText } from 'bh-shared-ui';
 import { Settings } from 'sigma/settings';
-import { SHOW_NODE_SUBLABELS } from '../legacyView';
+import { NODE_LABEL_BACKGROUND, SHOW_NODE_SUBLABELS } from '../legacyView';
 import {
     EDGE_MIDDLE_ALIGN_OFFSET,
     EDGE_TYPES,
@@ -85,6 +85,12 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
     };
 
     const primaryLabel = labelTextRendered(data.label);
+    // Without a background box, a selected node's label is shown in the highlight color instead
+    const nodeLabelColor = NODE_LABEL_BACKGROUND
+        ? fillText
+        : data.highlighted
+          ? data.highlightedBackground ?? fillText
+          : settings.labelColor.color;
     const nodeSize = data.size ?? 0;
 
     context.font = `bold ${size}px ${font}`;
@@ -98,13 +104,15 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
 
     const primaryBounds = getNodeLabelBoundsBelowFromContext(context, primaryParams);
 
-    // Draw background at full opacity to mask any edge lines passing through the label area
-    context.globalAlpha = 1;
-    context.fillStyle = fillBackground;
-    context.fillRect(...primaryBounds);
+    // Legacy view: no background box behind node labels (see NODE_LABEL_BACKGROUND)
+    if (NODE_LABEL_BACKGROUND) {
+        context.globalAlpha = 1;
+        context.fillStyle = fillBackground;
+        context.fillRect(...primaryBounds);
+    }
 
     context.globalAlpha = calculateLabelOpacity(labelScale) * dimFactor;
-    context.fillStyle = fillText;
+    context.fillStyle = nodeLabelColor;
     context.fillText(
         primaryLabel,
         primaryBounds[0] + LABEL_PADDING,
@@ -128,12 +136,14 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
 
         const sublabelBounds = getNodeLabelBoundsBelowFromContext(context, sublabelParams, primaryBounds[3]);
 
-        context.globalAlpha = 1;
-        context.fillStyle = fillBackground;
-        context.fillRect(...sublabelBounds);
+        if (NODE_LABEL_BACKGROUND) {
+            context.globalAlpha = 1;
+            context.fillStyle = fillBackground;
+            context.fillRect(...sublabelBounds);
+        }
 
         context.globalAlpha = calculateLabelOpacity(labelScale) * dimFactor;
-        context.fillStyle = fillText;
+        context.fillStyle = nodeLabelColor;
         context.fillText(
             sublabelText,
             sublabelBounds[0] + LABEL_PADDING,
