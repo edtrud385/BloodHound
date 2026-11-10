@@ -94,7 +94,7 @@ export const parallelCurveScale = (sigma: Sigma, labelPx: number, groupSpread: n
 export const EDGE_BASE_SIZE = 4;
 
 /** Thinnest on-screen width (px) of a tapered edge's narrow end; the whole edge scales up to keep it. */
-export const EDGE_MIN_END_PX = 0.7;
+export const EDGE_MIN_END_PX = 0.9;
 
 /**
  * GLSL replacing sigma's per-vertex `max(normalLength, 1.7 * u_sqrtZoomRatio)` floor. Applied to each
