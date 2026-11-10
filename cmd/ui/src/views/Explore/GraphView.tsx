@@ -223,7 +223,7 @@ const GraphView: FC = () => {
                   <MenuItem
                       key='legacy-expand'
                       onClick={() => {
-                          expandInPlace(graphologyGraph!, contextMenuNode);
+                          expandInPlace(graphologyGraph!, contextMenuNode, sigmaChartRef.current?.getViewBounds());
                           sigmaChartRef.current?.refresh();
                       }}>
                       Expand {contextMenuCollapsedCount} collapsed nodes
