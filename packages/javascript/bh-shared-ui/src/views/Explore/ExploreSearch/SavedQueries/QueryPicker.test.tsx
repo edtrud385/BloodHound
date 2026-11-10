@@ -14,7 +14,39 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { fillPickerQuery, toCypherString } from './QueryPicker';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { rest } from 'msw';
+import { setupServer } from 'msw/node';
+import { QueryClient, QueryClientProvider } from 'react-query';
+import { vi } from 'vitest';
+import QueryPickerDialog, { fillPickerQuery, toCypherString } from './QueryPicker';
+
+const server = setupServer(
+    rest.post('/api/v2/graphs/cypher', (req, res, ctx) =>
+        res(
+            ctx.json({
+                data: {
+                    nodes: {
+                        '1': { label: 'PRIVILEGED ROLE ADMINISTRATOR@CORP', kind: 'AZRole' },
+                        '2': { label: 'GLOBAL ADMINISTRATOR@CORP', kind: 'AZRole' },
+                    },
+                    edges: [],
+                },
+            })
+        )
+    )
+);
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+const picker = {
+    title: 'Select a Privileged Role...',
+    options: 'MATCH (n:AZRole) RETURN n',
+    query: 'MATCH p=(s)-[:AZHasRole]->(t:AZRole)\nWHERE t.name = $result\nRETURN p',
+};
 
 describe('QueryPicker helpers', () => {
     it('quotes picked names as Cypher strings', () => {
@@ -31,5 +63,39 @@ describe('QueryPicker helpers', () => {
         expect(fillPickerQuery(picker, 'CORP.LOCAL')).toBe(
             "MATCH p=(c:Computer)-[:HasSession]->(u)\nWHERE c.domain = 'CORP.LOCAL' AND u.domain <> 'CORP.LOCAL'\nRETURN p"
         );
+    });
+});
+
+describe('QueryPickerDialog', () => {
+    it('lists the options and reports the one picked', async () => {
+        const user = userEvent.setup();
+        const onPick = vi.fn();
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <QueryPickerDialog picker={picker} onPick={onPick} onClose={vi.fn()} />
+            </QueryClientProvider>
+        );
+
+        expect(screen.getByText('Select a Privileged Role...')).toBeInTheDocument();
+        const options = await screen.findAllByRole('button', { name: /ADMINISTRATOR@CORP/ });
+        expect(options.map((o) => o.textContent)).toEqual([
+            'GLOBAL ADMINISTRATOR@CORP',
+            'PRIVILEGED ROLE ADMINISTRATOR@CORP',
+        ]);
+
+        await user.click(screen.getByText('GLOBAL ADMINISTRATOR@CORP'));
+        expect(onPick).toHaveBeenCalledWith('GLOBAL ADMINISTRATOR@CORP');
+
+        await user.click(screen.getByRole('button', { name: 'Run for all (2)' }));
+        expect(onPick).toHaveBeenLastCalledWith(null);
+    });
+
+    it('stays closed without a picker', () => {
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <QueryPickerDialog onPick={vi.fn()} onClose={vi.fn()} />
+            </QueryClientProvider>
+        );
+        expect(screen.queryByTestId('prebuilt-query-picker')).toBeNull();
     });
 });

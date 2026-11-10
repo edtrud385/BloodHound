@@ -28,7 +28,7 @@ import { QueryLineItem, QueryListSection } from '../../../../types';
 import { cn } from '../../../../utils';
 import { useSavedQueriesContext } from '../../providers';
 import ConfirmDeleteQueryDialog from './ConfirmDeleteQueryDialog';
-import QueryPicker, { fillPickerQuery } from './QueryPicker';
+import QueryPickerDialog, { fillPickerQuery } from './QueryPicker';
 import QuerySearchFilter from './QuerySearchFilter';
 
 type CommonSearchesProps = {
@@ -139,38 +139,33 @@ const CommonSearches = ({
         return filteredData;
     }, [queryList, searchTerm, platform, categoryFilter, source, selfId, isFiltered]);
 
-    // Legacy-style picker step for the clicked query, if it has one, and the name chosen in it
-    const [pickedValue, setPickedValue] = useState<string | null>(null);
-    const selectedItem = useMemo(
-        () =>
-            selected.query
-                ? queryList
-                      .flatMap((section) => section.queries)
-                      .find((q) => q.query === selected.query && q.id === selected.id)
-                : undefined,
-        [queryList, selected]
-    );
-    const activePicker = selectedItem?.picker;
+    // Legacy-style picker step: the clicked query whose "Select a ..." dialog is open
+    const [pickingFor, setPickingFor] = useState<QueryLineItem>();
+
+    const runQuery = (query: string, id: number | undefined, cypher: string = query) => {
+        setSelected({ query, id });
+        onSetCypherQuery(cypher);
+        onPerformCypherSearch(cypher);
+    };
 
     const handlePick = (value: string | null) => {
-        if (!selectedItem || !activePicker) return;
-        setPickedValue(value);
-        const query = value ? fillPickerQuery(activePicker, value) : selectedItem.query;
-        onSetCypherQuery(query);
-        onPerformCypherSearch(query);
+        if (!pickingFor?.picker) return;
+        runQuery(pickingFor.query, pickingFor.id, value ? fillPickerQuery(pickingFor.picker, value) : pickingFor.query);
+        setPickingFor(undefined);
     };
 
     const handleClick = (query: string, id: number | undefined) => {
-        setPickedValue(null);
-        if (selected.query === query && selected.id === id) {
+        const item = queryList.flatMap((section) => section.queries).find((q) => q.query === query && q.id === id);
+        if (item?.picker) {
+            // Ask first, like Legacy; nothing runs until a choice is made
+            setPickingFor(item);
+        } else if (selected.query === query && selected.id === id) {
             //deselect
             setSelected({ query: '', id: undefined });
             onSetCypherQuery('');
             onPerformCypherSearch('');
         } else {
-            setSelected({ query, id });
-            onSetCypherQuery(query);
-            onPerformCypherSearch(query);
+            runQuery(query, id);
         }
     };
 
@@ -252,14 +247,6 @@ const CommonSearches = ({
                     platform={platform}
                     categoryFilter={categoryFilter}
                     source={source}></QuerySearchFilter>
-                {activePicker && (
-                    <QueryPicker
-                        key={`${selected.query}-${selected.id}`}
-                        picker={activePicker}
-                        value={pickedValue}
-                        onChange={handlePick}
-                    />
-                )}
             </div>
 
             <div className={cn('grow-1 min-h-0 overflow-auto', { hidden: !showCommonQueries })}>
@@ -272,6 +259,11 @@ const CommonSearches = ({
                 />
             </div>
 
+            <QueryPickerDialog
+                picker={pickingFor?.picker}
+                onPick={handlePick}
+                onClose={() => setPickingFor(undefined)}
+            />
             <ConfirmDeleteQueryDialog
                 open={open}
                 queryId={queryId}

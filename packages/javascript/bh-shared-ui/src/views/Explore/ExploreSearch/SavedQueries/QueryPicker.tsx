@@ -14,7 +14,17 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { Autocomplete, TextField } from '@mui/material';
+import {
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    List,
+    ListItemButton,
+    ListItemText,
+} from '@mui/material';
+import { Button } from 'doodle-ui';
 import { useQuery } from 'react-query';
 import { QueryPicker as QueryPickerType } from '../../../../types';
 import { apiClient } from '../../../../utils';
@@ -39,45 +49,57 @@ const fetchPickerOptions = async (optionsQuery: string): Promise<string[]> => {
     }
 };
 
-type QueryPickerProps = {
-    picker: QueryPickerType;
-    value: string | null;
-    /** Called with the chosen name, or null for "all" (the query as listed). */
-    onChange: (value: string | null) => void;
+type QueryPickerDialogProps = {
+    /** The picker of the clicked query; the dialog is open while this is set. */
+    picker?: QueryPickerType;
+    /** Called with the chosen name, or null for "All" (the query as listed). */
+    onPick: (value: string | null) => void;
+    onClose: () => void;
 };
 
 /**
- * Legacy-style picker step: after a pre-built query runs for everything, choose one domain, group or role
- * to run it for just that one. Clearing the choice goes back to the run-everything query.
+ * Legacy-style picker step: clicking a pre-built query that has one first asks which domain, group or
+ * role to run it for, then runs it for that one (or for all of them).
  */
-const QueryPicker = ({ picker, value, onChange }: QueryPickerProps) => {
-    const optionsQuery = useQuery(['prebuilt-query-picker', picker.options], () => fetchPickerOptions(picker.options), {
-        staleTime: 60_000,
-        refetchOnWindowFocus: false,
-    });
-
+const QueryPickerDialog = ({ picker, onPick, onClose }: QueryPickerDialogProps) => {
+    const optionsQuery = useQuery(
+        ['prebuilt-query-picker', picker?.options],
+        () => fetchPickerOptions(picker!.options),
+        { enabled: !!picker, staleTime: 60_000, refetchOnWindowFocus: false }
+    );
     const options = optionsQuery.data ?? [];
 
     return (
-        <div className='mt-2' data-testid='prebuilt-query-picker'>
-            <Autocomplete
-                size='small'
-                options={options}
-                value={value}
-                loading={optionsQuery.isLoading}
-                onChange={(_event, newValue) => onChange(newValue)}
-                noOptionsText={optionsQuery.isError ? 'Could not load options' : 'Nothing to choose from'}
-                renderInput={(params) => (
-                    <TextField
-                        {...params}
-                        label={picker.title}
-                        placeholder={`All (${options.length})`}
-                        helperText={value ? undefined : 'Showing all. Pick one to narrow the query.'}
-                    />
+        <Dialog open={!!picker} onClose={onClose} maxWidth='sm' fullWidth data-testid='prebuilt-query-picker'>
+            <DialogTitle>{picker?.title}</DialogTitle>
+            <DialogContent dividers className='p-0'>
+                {optionsQuery.isLoading ? (
+                    <div className='flex justify-center p-6'>
+                        <CircularProgress size={28} />
+                    </div>
+                ) : optionsQuery.isError ? (
+                    <p className='p-4'>Could not load the options. Try again, or run it for all.</p>
+                ) : (
+                    <List dense disablePadding>
+                        {options.map((option) => (
+                            <ListItemButton key={option} divider onClick={() => onPick(option)}>
+                                <ListItemText primary={option} />
+                            </ListItemButton>
+                        ))}
+                        {options.length === 0 && <p className='p-4'>Nothing to choose from in this database.</p>}
+                    </List>
                 )}
-            />
-        </div>
+            </DialogContent>
+            <DialogActions>
+                <Button variant='secondary' onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button variant='secondary' onClick={() => onPick(null)}>
+                    Run for all{options.length ? ` (${options.length})` : ''}
+                </Button>
+            </DialogActions>
+        </Dialog>
     );
 };
 
-export default QueryPicker;
+export default QueryPickerDialog;

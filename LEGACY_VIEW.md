@@ -33,9 +33,10 @@ The Sophos set lives in `packages/javascript/bh-shared-ui/src/commonSearchesSoph
 copy is empty on purpose: the real queries are generated locally and never committed (the file is
 marked `skip-worktree`, so git ignores the local copy).
 
-Pre-built queries can carry a Legacy-style **picker** (`QueryPicker` in `types.ts`): the query first
-runs for everything, then a dropdown such as "Select a Domain..." lists the nodes its `options` query
-returns, and choosing one runs the picker's query with `$result` replaced by that node's name.
+Pre-built queries can carry a Legacy-style **picker** (`QueryPicker` in `types.ts`): clicking the query
+opens a dialog such as "Select a Domain..." that lists the nodes its `options` query returns. Choosing
+one runs the picker's query with `$result` replaced by that node's name; **Run for all** runs the query
+as listed.
 
 This UI expects a CE 9.x server. Against CE 8.x the node panel and the right-click menu stay empty,
 because 8.x has no `/api/v2/nodes/{id}` endpoint. Graphs still draw: 8.x sends edges without ids, and
