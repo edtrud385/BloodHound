@@ -16,6 +16,9 @@
 
 import { HTMLProps } from 'react';
 import { EntityInfoDataTableGraphed, EntityInfoPanel } from '../../components';
+import ReachableTierZeroSection, {
+    REACHABLE_TIER_ZERO_LABEL,
+} from '../../components/EntityInfo/ReachableTierZeroSection';
 import { isNodeResponse, isRelationshipResponse, useExploreSelectedItem } from '../../hooks';
 import { EdgeInfoPane } from './EdgeInfo';
 
@@ -44,6 +47,19 @@ const GraphItemInformationPanel = () => {
                 className={defaultClasses}
                 selectedNode={selectedItemQuery.data}
                 DataTable={EntityInfoDataTableGraphed}
+                leadingTables={
+                    selectedItemQuery.data.properties?.objectid
+                        ? [
+                              {
+                                  sectionProps: {
+                                      id: selectedItemQuery.data.properties.objectid,
+                                      label: REACHABLE_TIER_ZERO_LABEL,
+                                  },
+                                  TableComponent: ReachableTierZeroSection,
+                              },
+                          ]
+                        : undefined
+                }
             />
         );
     }

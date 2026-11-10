@@ -15,4 +15,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export * from './EntityInfoPanel';
+export { REACHABLE_TIER_ZERO_LABEL, reachableTierZeroQuery } from './ReachableTierZeroSection';
 export { default } from './EntityInfoPanel';

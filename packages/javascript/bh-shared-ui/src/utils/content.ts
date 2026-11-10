@@ -41,6 +41,7 @@ export interface EntityInfoDataTableProps {
 export interface EntityInfoContentProps {
     DataTable: React.FC<EntityInfoDataTableProps>;
     priorityTables?: EntityTables;
+    leadingTables?: EntityTables;
     additionalTables?: EntityTables;
     selectedNode: NodeDetailsWithInfo;
 }
