@@ -282,7 +282,10 @@ const initGraphEdges = (
                 edgeParams.groupSize = groupSize;
             }
 
-            graph.addEdgeWithKey(`${REL_ID_PREFIX}${edge.id}`, edge.source, edge.target, edgeParams);
+            // CE 8.x servers don't send edge ids; fall back to the source/kind/target key so edges don't collide
+            const edgeId = edge.id ?? key;
+            if (graph.hasEdge(`${REL_ID_PREFIX}${edgeId}`)) continue;
+            graph.addEdgeWithKey(`${REL_ID_PREFIX}${edgeId}`, edge.source, edge.target, edgeParams);
         }
     }
 };
