@@ -12,15 +12,16 @@ it works the same whether CE stores its graph in Neo4j or PostgreSQL.
 | Readable at full zoom-out | Nodes and labels keep a readable size at the fitted view and grow smoothly as you zoom in (like Legacy), reaching CE's normal size at 1:1. Labels are single-line (no "Active Directory \| User" sublabel), and are only dropped where they would sit almost exactly on top of each other. The **A−/A+** buttons next to the graph controls make node and edge labels smaller or bigger (remembered in your browser). |
 | Less clutter | Legacy-style node collapse: when a node has 5 or more leaf neighbours, the leaves are hidden and the node shows a black count bubble; hovering the node says what is folded in (e.g. "694 Computers folded in (HasSession)"). **Double-click** the node, or **right-click → Expand N collapsed nodes**, to expand them; the layout re-runs and the view refits so they settle into the columns. **Right-click → Collapse N nodes** folds them back the same way. The layer button turns collapsing off and on, and selecting a hidden node (for example from search) expands its parent. |
 | Path highlight | CE 9.x dims everything that isn't on a path through the selected node. The route button toggles that on and off (CE has the setting but no button for it). |
-| Legacy-style look | Icons are drawn at 75% of CE's size and node labels in regular weight so names stand out, and edges taper from a wider source end to a narrower target end at every zoom (the edge shaders scale the whole edge to meet sigma's minimum width, instead of flattening each end to it). No white box behind node or edge labels. Edge labels are drawn along the edge, just above the line, and never upside down; they get the same readable-size floor as node labels. Parallel edges between the same two nodes are spread so each label sits on its own curve. A selected node's label shows in the highlight color. |
+| Legacy-style look | Icons are drawn at 75% of CE's size, node labels in regular weight and edges 1.5 times as wide so names stand out, and edges taper from a wider source end to a narrower target end at every zoom (the edge shaders scale the whole edge to meet sigma's minimum width, instead of flattening each end to it). No white box behind node or edge labels. Edge labels are drawn along the edge, just above the line, and never upside down; they get the same readable-size floor as node labels. Parallel edges between the same two nodes are spread so each label sits on its own curve. A selected node's label shows in the highlight color. |
 | Bug fixes (upstream) | Hidden nodes are zeroed for the whole triangle in the node and glyph WebGL programs (upstream zeroed one vertex, which drew stray wedges). Each node program binds its own icon texture before drawing (upstream used whatever was bound last, so icons vanished on hover or selection). Drag state is kept in a ref, so a quick click can no longer leave a node stuck to the mouse. Hidden edges are no longer clickable. Curved (parallel) edges were looked up by their `rel_<id>` key as if it were `source_kind_target`, so they never got their own curve; they are now looked up by `exploreGraphId`. |
 
 Nearly all of the logic is in `cmd/ui/src/rendering/legacyView.ts`, with small hooks in the files it
 plugs into. That keeps rebases onto new CE releases small. Tunables (collapse threshold, size and label
 floors, declutter, label boxes, sublabels, edge-label style) are constants in that file.
 
-Full node names: CE truncates long labels by default. Turn that off with CE's own "label clipping"
-setting if you want Legacy's full names.
+Node names: labels up to 40 characters are shown in full (CE cuts at 20). Longer ones lose part of
+their domain, never the name before `@` (or before the first `.` for computers), and labels with a SID
+are never shortened. CE's own "label clipping" setting still turns shortening off entirely.
 
 ## Query sets and pickers
 

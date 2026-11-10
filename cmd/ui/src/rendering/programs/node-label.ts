@@ -14,9 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { truncateText } from 'bh-shared-ui';
 import { Settings } from 'sigma/settings';
-import { NODE_LABEL_BACKGROUND, NODE_LABEL_WEIGHT, SHOW_NODE_SUBLABELS } from '../legacyView';
+import { NODE_LABEL_BACKGROUND, NODE_LABEL_WEIGHT, SHOW_NODE_SUBLABELS, shortenNodeLabel } from '../legacyView';
 import {
     EDGE_MIDDLE_ALIGN_OFFSET,
     EDGE_TYPES,
@@ -81,7 +80,8 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
 
     const labelTextRendered = (labelText: string) => {
         if (data.isExploreGraphLabelClip === false) return labelText;
-        return data.highlighted ? labelText : truncateText(labelText) ?? labelText;
+        // Legacy view: shorten only the domain; the name before @ (or the first .) and SIDs stay whole
+        return data.highlighted ? labelText : shortenNodeLabel(labelText);
     };
 
     const primaryLabel = labelTextRendered(data.label);

@@ -74,6 +74,30 @@ export const NODE_LABEL_WEIGHT = 'normal';
 export const EDGE_TAPER_START = 1.6;
 export const EDGE_TAPER_END = 0.45;
 
+/** Longest node label shown in full (CE cuts at 20); longer labels lose part of their domain, never the name. */
+export const LABEL_MAX_CHARS = 40;
+
+const SID_PATTERN = /S-1-\d+(-\d+)+/i;
+
+/**
+ * Shorten a node label Legacy-style: only the domain is cut, never the name. The part before the first
+ * "@" (users, groups) or "." (computers, domains) is always shown whole, and labels containing a SID are
+ * never shortened. "SVC_SQLREPORTING01@CORP.EXAMPLE.COM" becomes "SVC_SQLREPORTING01@…" rather than
+ * CE's "SVC_SQLREPORTING01@C...".
+ */
+export const shortenNodeLabel = (label: string | undefined, maxChars: number = LABEL_MAX_CHARS): string => {
+    if (!label) return '';
+    if (label.length <= maxChars || SID_PATTERN.test(label)) return label;
+    const at = label.indexOf('@');
+    const dot = label.indexOf('.');
+    const split = at > 0 ? at : dot > 0 ? dot : -1;
+    if (split < 0) return label; // no domain to drop: the whole label is the name
+    const head = label.slice(0, split + 1);
+    const room = maxChars - head.length;
+    // Keep a meaningful bit of the domain when there's room, otherwise just mark that it was cut
+    return room >= 4 ? `${head}${label.slice(split + 1, split + 1 + room)}…` : `${head}…`;
+};
+
 /** On-screen gap between the labels of parallel edges, in label heights. */
 export const PARALLEL_LABEL_SPACING = 1.3;
 
@@ -92,6 +116,9 @@ export const parallelCurveScale = (sigma: Sigma, labelPx: number, groupSpread: n
 
 /** Width CE gives every edge (views/Explore/utils.ts); the shaders scale tapered edges from it. */
 export const EDGE_BASE_SIZE = 4;
+
+/** Drawn edge width relative to CE's (1.5 = half as thick again); arrowheads and their spacing are unchanged. */
+export const EDGE_WIDTH_SCALE = 1.5;
 
 /** Thinnest on-screen width (px) of a tapered edge's narrow end; the whole edge scales up to keep it. */
 export const EDGE_MIN_END_PX = 0.9;

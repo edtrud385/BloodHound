@@ -16,7 +16,7 @@
 
 // Sigma's edge.clamped.vert.glsl (v2.4) with one change for the Legacy view: the minimum on-screen
 // thickness scales the whole edge instead of each end, so tapered edges keep their taper when zoomed out.
-import { TAPERED_THICKNESS_GLSL } from 'src/rendering/legacyView';
+import { EDGE_WIDTH_SCALE, TAPERED_THICKNESS_GLSL } from 'src/rendering/legacyView';
 
 export const vertexShaderSource = /* glsl */ `
 attribute vec4 a_color;
@@ -42,9 +42,14 @@ void main() {
 
   // These first computations are taken from edge.vert.glsl. Please read it to
   // get better comments on what's happening:
-  float pixelsThickness = ${TAPERED_THICKNESS_GLSL};
+  float pixelsThickness = max(normalLength, minThickness * u_sqrtZoomRatio);
   float webGLThickness = pixelsThickness * u_correctionRatio;
   float adaptedWebGLThickness = webGLThickness * u_sqrtZoomRatio;
+
+  // Legacy view: the drawn width scales the whole (tapered) edge so its narrow end meets the minimum,
+  // keeping the taper at every zoom, then applies EDGE_WIDTH_SCALE. The arrowhead spacing below still
+  // uses CE's width, so lines meet their arrowheads.
+  float drawnWebGLThickness = (${TAPERED_THICKNESS_GLSL}) * ${EDGE_WIDTH_SCALE.toFixed(2)} * u_correctionRatio * u_sqrtZoomRatio;
 
   // Here, we move the point to leave space for the arrow head:
   float direction = sign(a_radius);
@@ -54,9 +59,9 @@ void main() {
   vec2 compensationVector = vec2(-direction * unitNormal.y, direction * unitNormal.x) * (adaptedWebGLNodeRadius + adaptedWebGLArrowHeadLength);
 
   // Here is the proper position of the vertex
-  gl_Position = vec4((u_matrix * vec3(a_position + unitNormal * adaptedWebGLThickness + compensationVector, 1)).xy, 0, 1);
+  gl_Position = vec4((u_matrix * vec3(a_position + unitNormal * drawnWebGLThickness + compensationVector, 1)).xy, 0, 1);
 
-  v_thickness = webGLThickness / u_sqrtZoomRatio;
+  v_thickness = drawnWebGLThickness / (u_sqrtZoomRatio * u_sqrtZoomRatio);
 
   v_normal = unitNormal;
   v_color = a_color;
