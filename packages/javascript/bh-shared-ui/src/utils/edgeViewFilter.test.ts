@@ -19,6 +19,8 @@ import {
     applyEdgeFilterView,
     deleteEdgeFilterView,
     getEdgeFilterState,
+    getQueryHiddenEdgeKinds,
+    recalculateWithEdgeFilter,
     resetEdgeFilter,
     saveEdgeFilterView,
     setEdgeKindsHidden,
@@ -71,5 +73,24 @@ describe('edge filter views', () => {
         expect(getEdgeFilterState().hiddenKinds).toEqual(['CanRDP', 'HasSession']);
         expect(getEdgeFilterState().hideOrphans).toBe(false);
         expect(JSON.parse(localStorage.getItem('bh-edge-view-filter')!).views).toHaveLength(1);
+    });
+});
+
+describe('recalculate', () => {
+    beforeEach(() => resetEdgeFilter());
+
+    it('strips hidden kinds from the recalculated query only', () => {
+        setEdgeKindsHidden(['HasSession'], true);
+        recalculateWithEdgeFilter('encoded-query-1');
+        const filter = getEdgeFilterState();
+        expect(getQueryHiddenEdgeKinds(filter, 'encoded-query-1')).toEqual(['HasSession']);
+        expect(getQueryHiddenEdgeKinds(filter, 'encoded-query-2')).toEqual([]);
+    });
+
+    it('is cleared by Show all', () => {
+        setEdgeKindsHidden(['HasSession'], true);
+        recalculateWithEdgeFilter('encoded-query-1');
+        resetEdgeFilter();
+        expect(getQueryHiddenEdgeKinds(getEdgeFilterState(), 'encoded-query-1')).toEqual([]);
     });
 });
