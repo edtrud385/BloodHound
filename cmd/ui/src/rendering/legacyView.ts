@@ -189,18 +189,23 @@ export const expandCollapsed = (graph: MultiDirectedGraph, node: string): string
 export const getExpandedCount = (attrs: Attributes): number =>
     (attrs.expandedMembers as string[] | undefined)?.length ?? 0;
 
-/** Spacing for leaves expanded in place: one column beside the parent, like a dagre rank. */
-const EXPAND_ROW_SPACING = 100;
-const EXPAND_OFFSET = 500;
+/** The part of the graph currently on screen, in graph coordinates. */
+export type ViewBounds = { xMin: number; xMax: number; yMin: number; yMax: number };
+
+/** Largest gap between leaves expanded in place (small groups); big groups are squeezed to fit the screen.
+    The offset is only used when the screen size isn't known. */
+const EXPAND_MAX_ROW_SPACING = 100;
+const EXPAND_MIN_OFFSET = 500;
 
 /**
- * Expand the leaves folded into `node` without touching the rest of the layout: every other node
- * stays where it is and the leaves are placed in one column beside their parent, centred on it (left
- * of it when they point at it, right of it when it points at them, matching the left-to-right flow),
- * the same way the layout itself would rank them. The parent remembers them so they can be folded
- * back with `recollapse`. Returns the ids that were revealed.
+ * Expand the leaves folded into `node` without touching the rest of the layout or the camera:
+ * every other node stays where it is and the leaves are placed in one column beside their parent,
+ * like a layout rank (left of it when they point at it, right of it when it points at them). Like
+ * Legacy, the column is squeezed to fit the screen's height and set well out from the parent, so
+ * the whole fan is visible at once; zoom in to separate overlapping names. The parent remembers
+ * the leaves so they can be folded back with `recollapse`. Returns the ids that were revealed.
  */
-export const expandInPlace = (graph: MultiDirectedGraph, node: string): string[] => {
+export const expandInPlace = (graph: MultiDirectedGraph, node: string, view?: ViewBounds): string[] => {
     if (!graph.hasNode(node)) return [];
     const { x: px, y: py } = graph.getNodeAttributes(node);
     const members = expandCollapsed(graph, node).filter((member) => graph.hasNode(member));
@@ -209,10 +214,39 @@ export const expandInPlace = (graph: MultiDirectedGraph, node: string): string[]
     const incoming = members.filter((member) => graph.hasEdge(member, node));
     const outgoing = members.filter((member) => !graph.hasEdge(member, node));
 
+    const viewWidth = view ? view.xMax - view.xMin : 0;
+    const viewHeight = view ? view.yMax - view.yMin : 0;
+
     const place = (group: string[], side: -1 | 1) => {
+        if (!group.length) return;
+
+        // Horizontal: well out from the parent (about 40% of the screen), but short of the screen edge
+        let offset = EXPAND_MIN_OFFSET;
+        if (view) {
+            const room = side === 1 ? view.xMax - px : px - view.xMin;
+            const edgeMargin = viewWidth * 0.12;
+            offset = room > edgeMargin * 1.5 ? Math.min(viewWidth * 0.4, room - edgeMargin) : viewWidth * 0.4;
+        }
+        const x = px + side * offset;
+
+        // Vertical: fit the column into ~90% of the screen height
+        const usableHeight = viewHeight * 0.9;
+        const spacing =
+            group.length > 1 && usableHeight > 0
+                ? Math.min(EXPAND_MAX_ROW_SPACING, usableHeight / (group.length - 1))
+                : EXPAND_MAX_ROW_SPACING;
+        const columnHeight = spacing * (group.length - 1);
+
+        // Centre on the parent, nudged so the column stays on screen
+        let top = py - columnHeight / 2;
+        if (view && columnHeight <= usableHeight) {
+            const pad = viewHeight * 0.05;
+            top = Math.min(Math.max(top, view.yMin + pad), view.yMax - pad - columnHeight);
+        }
+
         group.forEach((member, i) => {
-            graph.setNodeAttribute(member, 'x', px + side * EXPAND_OFFSET);
-            graph.setNodeAttribute(member, 'y', py + (i - (group.length - 1) / 2) * EXPAND_ROW_SPACING);
+            graph.setNodeAttribute(member, 'x', x);
+            graph.setNodeAttribute(member, 'y', top + i * spacing);
         });
     };
     place(incoming, -1);

@@ -41,6 +41,7 @@ import {
 } from 'src/ducks/graph/utils';
 import {
     LABEL_DECLUTTER_RATIO,
+    ViewBounds,
     drawCollapsedBadges,
     getDeclutteredLabels,
     getLabelScale,
@@ -56,6 +57,8 @@ import { getFullPathHighlightedEntities, getIsHighlightedItemInGraph } from './u
 interface SigmaChartRef {
     resetCamera: () => void;
     refresh: () => void;
+    /** The part of the graph currently on screen, in graph coordinates. */
+    getViewBounds: () => ViewBounds;
     zoomTo: (id: string) => void;
     runSequentialLayout: () => void;
     runStandardLayout: () => void;
@@ -175,6 +178,26 @@ export const GraphEvents = forwardRef(function GraphEvents(
                 resetCamera(sigma);
             },
             refresh: () => sigma.refresh(),
+            getViewBounds: () => {
+                const { width, height } = sigma.getDimensions();
+                // The entity panel sits over the right of the graph; don't count the area behind it
+                let right = width;
+                const container = sigma.getContainer().getBoundingClientRect();
+                const panel = document
+                    .querySelector('[data-testid="explore_entity-information-panel"]')
+                    ?.getBoundingClientRect();
+                if (panel && panel.width > 0 && panel.left > container.left + width / 2) {
+                    right = Math.min(width, panel.left - container.left - 16);
+                }
+                const a = sigma.viewportToGraph({ x: 0, y: 0 });
+                const b = sigma.viewportToGraph({ x: right, y: height });
+                return {
+                    xMin: Math.min(a.x, b.x),
+                    xMax: Math.max(a.x, b.x),
+                    yMin: Math.min(a.y, b.y),
+                    yMax: Math.max(a.y, b.y),
+                };
+            },
 
             runSequentialLayout: () => {
                 const { width, height } = sigma.getDimensions();
