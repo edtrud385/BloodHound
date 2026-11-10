@@ -22,7 +22,7 @@ import {
     NodeDetails,
     SeedTypeObjectId,
 } from 'js-client-library';
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
 import {
     getOwnedTag,
     getTierZeroTag,
@@ -37,7 +37,9 @@ import CopyMenuItem from './CopyMenuItem';
 const ContextMenu: FC<{
     contextMenu: { mouseX: number; mouseY: number } | null;
     onClose?: () => void;
-}> = ({ contextMenu, onClose = () => {} }) => {
+    /** Extra items shown at the top of the menu (e.g. the Legacy view's expand/collapse). */
+    children?: ReactNode;
+}> = ({ contextMenu, onClose = () => {}, children }) => {
     const { selectedItemQuery } = useExploreSelectedItem();
     const { setExploreParams, primarySearch, secondarySearch } = useExploreParams();
     const { tagDetailsLink } = usePZPathParams();
@@ -91,6 +93,7 @@ const ContextMenu: FC<{
             onClose={onClose}
             onClick={onClose}
             keepMounted>
+            {children}
             <MenuItem onClick={handleSetStartingNode}>Set as starting node</MenuItem>
             <MenuItem onClick={handleSetEndingNode}>Set as ending node</MenuItem>
 

@@ -16,6 +16,7 @@
 
 import { faLayerGroup, faRoute } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { MenuItem } from '@mui/material';
 import {
     BaseExploreLayoutOptions,
     ContextMenuPrivilegeZonesEnabled,
@@ -70,8 +71,12 @@ import {
     LABEL_SIZE_MIN,
     LABEL_SIZE_STEP,
     expandCollapsed,
+    expandInPlace,
     findCollapsedParent,
+    getCollapsedCount,
+    getExpandedCount,
     getLabelSizeMultiplier,
+    recollapse,
     setLabelSizeMultiplier,
 } from 'src/rendering/legacyView';
 import { useAppDispatch, useAppSelector } from 'src/store';
@@ -202,6 +207,40 @@ const GraphView: FC = () => {
         const parent = findCollapsedParent(graphologyGraph, selectedItem);
         if (parent) expandCollapsedNode(parent);
     }, [graphologyGraph, selectedItem, expandCollapsedNode]);
+
+    /* Legacy view: right-click menu items to expand a count bubble in place (layout and camera stay put)
+       or fold the leaves back */
+    const contextMenuNode = contextMenu && selectedItem && graphologyGraph?.hasNode(selectedItem) ? selectedItem : null;
+    const contextMenuCollapsedCount = contextMenuNode
+        ? getCollapsedCount(graphologyGraph!.getNodeAttributes(contextMenuNode))
+        : 0;
+    const contextMenuExpandedCount = contextMenuNode
+        ? getExpandedCount(graphologyGraph!.getNodeAttributes(contextMenuNode))
+        : 0;
+    const legacyContextMenuItems = contextMenuNode
+        ? [
+              contextMenuCollapsedCount > 0 && (
+                  <MenuItem
+                      key='legacy-expand'
+                      onClick={() => {
+                          expandInPlace(graphologyGraph!, contextMenuNode);
+                          sigmaChartRef.current?.refresh();
+                      }}>
+                      Expand {contextMenuCollapsedCount} collapsed nodes
+                  </MenuItem>
+              ),
+              contextMenuExpandedCount > 0 && (
+                  <MenuItem
+                      key='legacy-collapse'
+                      onClick={() => {
+                          recollapse(graphologyGraph!, contextMenuNode);
+                          sigmaChartRef.current?.refresh();
+                      }}>
+                      Collapse {contextMenuExpandedCount} nodes
+                  </MenuItem>
+              ),
+          ].filter(Boolean)
+        : null;
 
     /* Legacy view: label size control (node and edge labels), remembered in this browser */
     const [labelSize, setLabelSize] = useState(getLabelSizeMultiplier);
@@ -436,14 +475,16 @@ const GraphView: FC = () => {
                 enabled={
                     <ContextMenuPrivilegeZonesEnabled
                         contextMenu={isNodeResponse(selectedItemQuery.data) ? contextMenu : null}
-                        onClose={handleCloseContextMenu}
-                    />
+                        onClose={handleCloseContextMenu}>
+                        {legacyContextMenuItems}
+                    </ContextMenuPrivilegeZonesEnabled>
                 }
                 disabled={
                     <ContextMenu
                         contextMenu={isNodeResponse(selectedItemQuery.data) ? contextMenu : null}
-                        handleClose={handleCloseContextMenu}
-                    />
+                        handleClose={handleCloseContextMenu}>
+                        {legacyContextMenuItems}
+                    </ContextMenu>
                 }
             />
 
