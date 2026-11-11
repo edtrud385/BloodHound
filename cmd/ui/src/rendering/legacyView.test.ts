@@ -14,7 +14,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { shortenNodeLabel } from './legacyView';
+import {
+    EDGE_LABEL_SIZE,
+    NODE_LABEL_SIZE,
+    getLabelScale,
+    getLabelSizeMultiplier,
+    setLabelSizeMultiplier,
+    shortenNodeLabel,
+} from './legacyView';
 
 describe('shortenNodeLabel', () => {
     it('keeps labels up to 40 characters as they are', () => {
@@ -43,5 +50,45 @@ describe('shortenNodeLabel', () => {
 
     it('keeps labels without a domain whole', () => {
         expect(shortenNodeLabel('ENTERPRISE KEY ADMINS AND OPERATORS')).toBe('ENTERPRISE KEY ADMINS AND OPERATORS');
+    });
+});
+
+describe('label sizes', () => {
+    afterEach(() => {
+        setLabelSizeMultiplier('node', 1);
+        setLabelSizeMultiplier('edge', 1);
+    });
+
+    it('draws edge labels at 16/22 of the node label size, like Legacy', () => {
+        expect(EDGE_LABEL_SIZE / NODE_LABEL_SIZE).toBeCloseTo(16 / 22);
+        expect(EDGE_LABEL_SIZE * getLabelScale(1, 'edge')).toBeCloseTo(
+            (NODE_LABEL_SIZE * getLabelScale(1, 'node') * 16) / 22
+        );
+    });
+
+    it('sizes node and edge labels independently', () => {
+        const edgeBefore = getLabelScale(1, 'edge');
+        setLabelSizeMultiplier('node', 1.5);
+        expect(getLabelSizeMultiplier('node')).toBe(1.5);
+        expect(getLabelScale(1, 'node')).toBeCloseTo(1.5 * getLabelScale(1, 'edge'));
+        expect(getLabelScale(1, 'edge')).toBe(edgeBefore);
+    });
+
+    it('remembers each size under its own key', () => {
+        const stored = new Map<string, string>();
+        const setItem = vi.fn((key: string, value: string) => stored.set(key, value));
+        vi.stubGlobal('localStorage', { getItem: (key: string) => stored.get(key) ?? null, setItem });
+        try {
+            setLabelSizeMultiplier('edge', 2);
+            expect(stored.get('bh-legacy-view-edge-label-size')).toBe('2');
+            expect(stored.has('bh-legacy-view-label-size')).toBe(false);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it('clamps to the allowed range', () => {
+        expect(setLabelSizeMultiplier('edge', 100)).toBe(2.5);
+        expect(setLabelSizeMultiplier('edge', 0.01)).toBe(0.6);
     });
 });

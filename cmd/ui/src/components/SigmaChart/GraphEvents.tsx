@@ -257,7 +257,7 @@ export const GraphEvents = forwardRef(function GraphEvents(
 
                     // Legacy view: spread parallel curves so each label fits on its own curve
                     const labelPx =
-                        sigma.getSettings().edgeLabelSize * getLabelScale(newData.inverseSqrtZoomRatio ?? 1);
+                        sigma.getSettings().edgeLabelSize * getLabelScale(newData.inverseSqrtZoomRatio ?? 1, 'edge');
                     const height =
                         calculateCurveHeight(data.groupSize, data.groupPosition, data.direction) *
                         parallelCurveScale(sigma, labelPx, GROUP_SPREAD);
