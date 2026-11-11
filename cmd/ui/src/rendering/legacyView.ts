@@ -67,6 +67,24 @@ export const EDGE_LABEL_ALONG_EDGE = true;
 /** Icons are drawn at this fraction of CE's size so names stand out, like Legacy (labels keep their size). */
 export const NODE_ICON_SCALE = 0.75;
 
+/**
+ * Glyph badges (Tier Zero gem, owned skull, ...) as a fraction of the node's size. CE draws them at
+ * 1/2.4 (≈0.42), which becomes tiny once icons are scaled down; Legacy's badges are well over half a node.
+ */
+export const GLYPH_SIZE_RATIO = 0.62;
+
+/**
+ * Faint blue-grey canvas in light mode, close to Legacy's, so a pasted screenshot or PNG export stands
+ * apart from a white page. Light enough that grey edges, dimmed items and labels keep their contrast.
+ */
+export const LIGHT_GRAPH_BACKGROUND = '#F0F4F8';
+
+/** The canvas colour for a theme background: the faint tint in place of pure white, otherwise unchanged (dark mode). */
+export const getGraphBackgroundColor = (themeBackground: string): string =>
+    /^#?f{3}(f{3})?$/i.test(themeBackground.trim()) || /^rgb\(\s*255,\s*255,\s*255\s*\)$/i.test(themeBackground.trim())
+        ? LIGHT_GRAPH_BACKGROUND
+        : themeBackground;
+
 /** Font weight of node labels (CE uses bold; Legacy-style labels are regular weight). */
 export const NODE_LABEL_WEIGHT = 'normal';
 

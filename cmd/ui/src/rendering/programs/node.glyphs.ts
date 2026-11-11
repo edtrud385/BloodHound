@@ -38,6 +38,7 @@ import { Coordinates, Dimensions, NodeDisplayData } from 'sigma/types';
 import { floatColor } from 'sigma/utils';
 import { fragmentShaderSource } from 'src/rendering/shaders/node.glyphs.frag';
 import { vertexShaderSource } from 'src/rendering/shaders/node.glyphs.vert';
+import { GLYPH_SIZE_RATIO } from '../legacyView';
 import { DEFAULT_BG_COLOR, DIM_FACTOR, NO_DIM_FACTOR } from '../utils/utils';
 
 const POINTS = 3,
@@ -439,7 +440,7 @@ export default function getNodeGlyphsProgram(): typeof AbstractNodeGlyphsProgram
                         hidden,
                         data.x,
                         data.y,
-                        data.size / 2.4,
+                        data.size * GLYPH_SIZE_RATIO, // Legacy view: bigger badges (CE: size / 2.4)
                         glyph.backgroundColor, //fill
                         glyph.color, //border
                         glyph.image,

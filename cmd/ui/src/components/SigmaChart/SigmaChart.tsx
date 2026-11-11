@@ -22,7 +22,7 @@ import { Attributes } from 'graphology-types';
 import { forwardRef, RefAttributes } from 'react';
 import { SigmaNodeEventPayload } from 'sigma/sigma';
 import { MAX_CAMERA_RATIO, MIN_CAMERA_RATIO } from 'src/ducks/graph/utils';
-import { EDGE_LABEL_SIZE, NODE_LABEL_SIZE } from 'src/rendering/legacyView';
+import { EDGE_LABEL_SIZE, NODE_LABEL_SIZE, getGraphBackgroundColor } from 'src/rendering/legacyView';
 import drawEdgeLabel from 'src/rendering/programs/edge-label';
 import EdgeArrowProgram from 'src/rendering/programs/edge.arrow';
 import CurvedEdgeArrowProgram from 'src/rendering/programs/edge.curvedArrow';
@@ -75,7 +75,8 @@ const SigmaChart = forwardRef<RefAttributes<HTMLDivElement>, SigmaChartProps>(fu
                     left: 0,
                     height: '100%',
                     width: '100%',
-                    background: theme.neutral.primary,
+                    // Legacy view: faint tint instead of pure white so exports stand out on a white page
+                    background: getGraphBackgroundColor(theme.neutral.primary),
                 }}
                 graph={graph}
                 settings={{
