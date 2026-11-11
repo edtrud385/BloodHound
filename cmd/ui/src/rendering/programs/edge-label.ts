@@ -141,8 +141,8 @@ const drawLabelAlongEdge = (
     settings: Settings
 ): void => {
     const inverseSqrtZoomRatio = edgeData.inverseSqrtZoomRatio || 1;
-    // Same sizing as node labels: readable floor, grows on zoom-in, follows the label-size setting
-    const labelScale = getLabelScale(inverseSqrtZoomRatio);
+    // Same sizing curve as node labels (readable floor, grows on zoom-in), with the edge label-size setting
+    const labelScale = getLabelScale(inverseSqrtZoomRatio, 'edge');
     const opacity = calculateLabelOpacity(labelScale);
     if (opacity <= 0) return;
 

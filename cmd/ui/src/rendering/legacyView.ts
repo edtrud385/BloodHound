@@ -138,35 +138,61 @@ export const edgeTaper = (t: number): number => EDGE_TAPER_START + (EDGE_TAPER_E
 /** Labels never render smaller than this fraction of their full-size font (12px * 0.85 ≈ 10px). */
 export const LABEL_MIN_SCALE = 0.85;
 
-/** Range and step for the user's label-size multiplier (node and edge labels). */
+/** Full-size node label font in px (CE's size; sigma's `labelSize`). */
+export const NODE_LABEL_SIZE = 12;
+
+/**
+ * Edge labels are this fraction of the node label size, like Legacy: its defaults are 22px node labels
+ * and 16px edge labels (BloodHound 4.3.1 performance.nodeLabelSize / edgeLabelSize).
+ */
+export const EDGE_TO_NODE_LABEL_RATIO = 16 / 22;
+
+/** Full-size edge label font in px (sigma's `edgeLabelSize`). */
+export const EDGE_LABEL_SIZE = NODE_LABEL_SIZE * EDGE_TO_NODE_LABEL_RATIO;
+
+/**
+ * Range and step for the user's label-size multipliers. Node and edge labels have one each, like
+ * Legacy's separate Node and Edge label size settings.
+ */
 export const LABEL_SIZE_MIN = 0.6;
 export const LABEL_SIZE_MAX = 2.5;
 export const LABEL_SIZE_STEP = 1.15;
-const LABEL_SIZE_STORAGE_KEY = 'bh-legacy-view-label-size';
 
-const readStoredLabelSize = (): number => {
+export type LabelKind = 'node' | 'edge';
+
+// The node key is the one the single (shared) setting used before, so a saved size carries over
+const LABEL_SIZE_STORAGE_KEYS: Record<LabelKind, string> = {
+    node: 'bh-legacy-view-label-size',
+    edge: 'bh-legacy-view-edge-label-size',
+};
+
+const readStoredLabelSize = (kind: LabelKind): number => {
     try {
-        const stored = Number(window.localStorage.getItem(LABEL_SIZE_STORAGE_KEY));
+        const stored = Number(window.localStorage.getItem(LABEL_SIZE_STORAGE_KEYS[kind]));
         return Number.isFinite(stored) && stored > 0 ? stored : 1;
     } catch {
         return 1;
     }
 };
 
-let labelSizeMultiplier = typeof window !== 'undefined' ? readStoredLabelSize() : 1;
+const labelSizeMultipliers: Record<LabelKind, number> =
+    typeof window !== 'undefined'
+        ? { node: readStoredLabelSize('node'), edge: readStoredLabelSize('edge') }
+        : { node: 1, edge: 1 };
 
-/** Current label-size multiplier (1 = default). */
-export const getLabelSizeMultiplier = (): number => labelSizeMultiplier;
+/** Current label-size multiplier for node or edge labels (1 = default). */
+export const getLabelSizeMultiplier = (kind: LabelKind = 'node'): number => labelSizeMultipliers[kind];
 
-/** Set the label-size multiplier (clamped) and remember it in this browser. Returns the applied value. */
-export const setLabelSizeMultiplier = (value: number): number => {
-    labelSizeMultiplier = Math.min(LABEL_SIZE_MAX, Math.max(LABEL_SIZE_MIN, value));
+/** Set a label-size multiplier (clamped) and remember it in this browser. Returns the applied value. */
+export const setLabelSizeMultiplier = (kind: LabelKind, value: number): number => {
+    const applied = Math.min(LABEL_SIZE_MAX, Math.max(LABEL_SIZE_MIN, value));
+    labelSizeMultipliers[kind] = applied;
     try {
-        window.localStorage.setItem(LABEL_SIZE_STORAGE_KEY, String(labelSizeMultiplier));
+        window.localStorage.setItem(LABEL_SIZE_STORAGE_KEYS[kind], String(applied));
     } catch {
         // storage unavailable (private window): the setting just won't persist
     }
-    return labelSizeMultiplier;
+    return applied;
 };
 
 /** Camera ratio of the last "fit whole graph" view; sizes are floored relative to it. */
@@ -201,12 +227,13 @@ export const getNodeSizeBoost = (cameraRatio: number): number => {
 
 /**
  * Label scale (font size; opacity uses it too). LABEL_MIN_SCALE at the fitted view, growing smoothly
- * as you zoom in (Legacy-like), never smaller than CE's own size, times the user's label-size setting.
+ * as you zoom in (Legacy-like), never smaller than CE's own size, times the user's label-size setting
+ * for that kind of label. Multiply by NODE_LABEL_SIZE or EDGE_LABEL_SIZE for the font size in px.
  */
-export const getLabelScale = (inverseSqrtZoomRatio: number): number => {
+export const getLabelScale = (inverseSqrtZoomRatio: number, kind: LabelKind = 'node'): number => {
     const cameraRatio = 1 / (inverseSqrtZoomRatio * inverseSqrtZoomRatio);
     const floor = flooredScale(cameraRatio, LABEL_MIN_SCALE, LABEL_SCALE_AT_ONE);
-    return Math.max(inverseSqrtZoomRatio, floor) * labelSizeMultiplier;
+    return Math.max(inverseSqrtZoomRatio, floor) * labelSizeMultipliers[kind];
 };
 
 /** Number of leaves currently folded into `node` (0 when none). */

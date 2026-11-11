@@ -22,6 +22,7 @@ import { Attributes } from 'graphology-types';
 import { forwardRef, RefAttributes } from 'react';
 import { SigmaNodeEventPayload } from 'sigma/sigma';
 import { MAX_CAMERA_RATIO, MIN_CAMERA_RATIO } from 'src/ducks/graph/utils';
+import { EDGE_LABEL_SIZE, NODE_LABEL_SIZE } from 'src/rendering/legacyView';
 import drawEdgeLabel from 'src/rendering/programs/edge-label';
 import EdgeArrowProgram from 'src/rendering/programs/edge.arrow';
 import CurvedEdgeArrowProgram from 'src/rendering/programs/edge.curvedArrow';
@@ -91,8 +92,9 @@ const SigmaChart = forwardRef<RefAttributes<HTMLDivElement>, SigmaChartProps>(fu
                     renderLabels: showNodeLabels,
                     hoverRenderer: drawHover,
                     edgeLabelRenderer: drawEdgeLabel,
-                    edgeLabelSize: 12,
-                    labelSize: 12,
+                    // Legacy view: edge labels are 16/22 of the node label size, like Legacy's defaults
+                    edgeLabelSize: EDGE_LABEL_SIZE,
+                    labelSize: NODE_LABEL_SIZE,
                     labelFont: 'Roboto',
                     labelColor: { color: theme.contrast },
                     labelRenderer: drawLabel,

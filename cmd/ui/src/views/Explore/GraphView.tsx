@@ -52,7 +52,7 @@ import {
 import { IconButton, Tooltip } from 'doodle-ui';
 import { MultiDirectedGraph } from 'graphology';
 import { Attributes } from 'graphology-types';
-import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, Fragment, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { SigmaNodeEventPayload } from 'sigma/sigma';
 import { NoDataFileUploadDialogWithLinks } from 'src/components/NoDataFileUploadDialogWithLinks';
@@ -70,6 +70,7 @@ import {
     LABEL_SIZE_MAX,
     LABEL_SIZE_MIN,
     LABEL_SIZE_STEP,
+    LabelKind,
     expandCollapsed,
     findCollapsedParent,
     getCollapsedCount,
@@ -260,10 +261,14 @@ const GraphView: FC = () => {
     /* Legacy-style edge filter panel */
     const [edgeFilterAnchor, setEdgeFilterAnchor] = useState<HTMLElement | null>(null);
 
-    /* Legacy view: label size control (node and edge labels), remembered in this browser */
-    const [labelSize, setLabelSize] = useState(getLabelSizeMultiplier);
-    const changeLabelSize = useCallback((factor: number) => {
-        setLabelSize(setLabelSizeMultiplier(getLabelSizeMultiplier() * factor));
+    /* Legacy view: separate node and edge label size controls (like Legacy's Node / Edge settings), remembered in this browser */
+    const [labelSize, setLabelSize] = useState<Record<LabelKind, number>>(() => ({
+        node: getLabelSizeMultiplier('node'),
+        edge: getLabelSizeMultiplier('edge'),
+    }));
+    const changeLabelSize = useCallback((kind: LabelKind, factor: number) => {
+        const applied = setLabelSizeMultiplier(kind, getLabelSizeMultiplier(kind) * factor);
+        setLabelSize((current) => ({ ...current, [kind]: applied }));
         sigmaChartRef.current?.refresh();
     }, []);
 
@@ -471,24 +476,32 @@ const GraphView: FC = () => {
                         testId='explore_graph-controls_path-highlight-toggle'>
                         <FontAwesomeIcon aria-hidden='true' icon={faRoute} />
                     </LegacyControlButton>
-                    <LegacyControlButton
-                        label='Smaller Labels'
-                        disabled={labelSize <= LABEL_SIZE_MIN}
-                        onClick={() => changeLabelSize(1 / LABEL_SIZE_STEP)}
-                        testId='explore_graph-controls_label-smaller'>
-                        <span aria-hidden='true' className='text-xs font-bold'>
-                            A−
-                        </span>
-                    </LegacyControlButton>
-                    <LegacyControlButton
-                        label='Bigger Labels'
-                        disabled={labelSize >= LABEL_SIZE_MAX}
-                        onClick={() => changeLabelSize(LABEL_SIZE_STEP)}
-                        testId='explore_graph-controls_label-bigger'>
-                        <span aria-hidden='true' className='text-base font-bold'>
-                            A+
-                        </span>
-                    </LegacyControlButton>
+                    {(['node', 'edge'] as const).map((kind) => {
+                        const noun = kind === 'node' ? 'Node' : 'Edge';
+                        const letter = kind === 'node' ? 'N' : 'E';
+                        return (
+                            <Fragment key={kind}>
+                                <LegacyControlButton
+                                    label={`Smaller ${noun} Labels`}
+                                    disabled={labelSize[kind] <= LABEL_SIZE_MIN}
+                                    onClick={() => changeLabelSize(kind, 1 / LABEL_SIZE_STEP)}
+                                    testId={`explore_graph-controls_${kind}-label-smaller`}>
+                                    <span aria-hidden='true' className='text-xs font-bold'>
+                                        {letter}−
+                                    </span>
+                                </LegacyControlButton>
+                                <LegacyControlButton
+                                    label={`Bigger ${noun} Labels`}
+                                    disabled={labelSize[kind] >= LABEL_SIZE_MAX}
+                                    onClick={() => changeLabelSize(kind, LABEL_SIZE_STEP)}
+                                    testId={`explore_graph-controls_${kind}-label-bigger`}>
+                                    <span aria-hidden='true' className='text-base font-bold'>
+                                        {letter}+
+                                    </span>
+                                </LegacyControlButton>
+                            </Fragment>
+                        );
+                    })}
                 </div>
             </div>
             <GraphItemInformationPanel />
