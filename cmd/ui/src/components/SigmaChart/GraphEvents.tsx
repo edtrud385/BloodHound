@@ -43,6 +43,7 @@ import {
 import {
     LABEL_DECLUTTER_RATIO,
     NODE_ICON_SCALE,
+    getGraphBackgroundColor,
     ViewBounds,
     describeCollapsed,
     drawCollapsedBadges,
@@ -423,7 +424,8 @@ export const GraphEvents = forwardRef(function GraphEvents(
     );
 
     useEffect(() => {
-        const bgColor = theme.neutral.primary;
+        // Dim toward the colour actually behind the graph (the Legacy view tint in light mode)
+        const bgColor = getGraphBackgroundColor(theme.neutral.primary);
         // dimFactor is how much of the original color shows through (1 = full, 0 = fully hidden).
         // Equivalent to 1 - nodeBlend from the old CPU-blend approach: dark 1-0.5=0.5, light 1-0.8=0.2.
         const nodeDimFactor = darkMode ? 0.5 : 0.2;

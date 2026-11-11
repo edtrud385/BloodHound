@@ -92,3 +92,13 @@ describe('label sizes', () => {
         expect(setLabelSizeMultiplier('edge', 0.01)).toBe(0.6);
     });
 });
+
+describe('graph background', () => {
+    it('tints a white light-mode canvas and leaves dark mode alone', async () => {
+        const { getGraphBackgroundColor, LIGHT_GRAPH_BACKGROUND } = await import('./legacyView');
+        expect(getGraphBackgroundColor('#FFFFFF')).toBe(LIGHT_GRAPH_BACKGROUND);
+        expect(getGraphBackgroundColor(' #fff ')).toBe(LIGHT_GRAPH_BACKGROUND);
+        expect(getGraphBackgroundColor('rgb(255, 255, 255)')).toBe(LIGHT_GRAPH_BACKGROUND);
+        expect(getGraphBackgroundColor('#121212')).toBe('#121212');
+    });
+});
