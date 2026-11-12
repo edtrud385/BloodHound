@@ -37,7 +37,7 @@ import CopyMenuItem from './CopyMenuItem';
 const ContextMenu: FC<{
     contextMenu: { mouseX: number; mouseY: number } | null;
     onClose?: () => void;
-    /** Extra items shown at the top of the menu (e.g. the Legacy view's expand/collapse). */
+    /** Extra items shown at the bottom of the menu (e.g. the Legacy view's expand/collapse). */
     children?: ReactNode;
 }> = ({ contextMenu, onClose = () => {}, children }) => {
     const { selectedItemQuery } = useExploreSelectedItem();
@@ -93,7 +93,6 @@ const ContextMenu: FC<{
             onClose={onClose}
             onClick={onClose}
             keepMounted>
-            {children}
             <MenuItem onClick={handleSetStartingNode}>Set as starting node</MenuItem>
             <MenuItem onClick={handleSetEndingNode}>Set as ending node</MenuItem>
 
@@ -111,6 +110,7 @@ const ContextMenu: FC<{
             />
 
             <CopyMenuItem />
+            {children}
         </Menu>
     );
 };
