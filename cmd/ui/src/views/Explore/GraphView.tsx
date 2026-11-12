@@ -14,9 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { faLayerGroup, faRoute } from '@fortawesome/free-solid-svg-icons';
+import { faCamera, faLayerGroup, faMinus, faPlus, faRoute, faTextHeight } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { MenuItem } from '@mui/material';
+import { MenuItem, Popover } from '@mui/material';
 import {
     BaseExploreLayoutOptions,
     ContextMenuPrivilegeZonesEnabled,
@@ -52,7 +52,7 @@ import {
 import { IconButton, Tooltip } from 'doodle-ui';
 import { MultiDirectedGraph } from 'graphology';
 import { Attributes } from 'graphology-types';
-import { FC, Fragment, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { SigmaNodeEventPayload } from 'sigma/sigma';
 import { NoDataFileUploadDialogWithLinks } from 'src/components/NoDataFileUploadDialogWithLinks';
@@ -90,7 +90,7 @@ import { transformIconDictionary } from './svgIcons';
 /** Legacy view: one icon button in the graph controls row, styled like CE's own controls */
 const LegacyControlButton: FC<{
     label: string;
-    onClick: () => void;
+    onClick: (event: MouseEvent<HTMLButtonElement>) => void;
     pressed?: boolean;
     disabled?: boolean;
     testId: string;
@@ -262,6 +262,7 @@ const GraphView: FC = () => {
     const [edgeFilterAnchor, setEdgeFilterAnchor] = useState<HTMLElement | null>(null);
 
     /* Legacy view: separate node and edge label size controls (like Legacy's Node / Edge settings), remembered in this browser */
+    const [labelSizeAnchor, setLabelSizeAnchor] = useState<HTMLElement | null>(null);
     const [labelSize, setLabelSize] = useState<Record<LabelKind, number>>(() => ({
         node: getLabelSizeMultiplier('node'),
         edge: getLabelSizeMultiplier('edge'),
@@ -476,35 +477,57 @@ const GraphView: FC = () => {
                         testId='explore_graph-controls_path-highlight-toggle'>
                         <FontAwesomeIcon aria-hidden='true' icon={faRoute} />
                     </LegacyControlButton>
-                    {(['node', 'edge'] as const).map((kind) => {
-                        const noun = kind === 'node' ? 'Node' : 'Edge';
-                        const letter = kind === 'node' ? 'N' : 'E';
-                        return (
-                            <Fragment key={kind}>
-                                <LegacyControlButton
-                                    label={`Smaller ${noun} Labels`}
-                                    disabled={labelSize[kind] <= LABEL_SIZE_MIN}
-                                    onClick={() => changeLabelSize(kind, 1 / LABEL_SIZE_STEP)}
-                                    testId={`explore_graph-controls_${kind}-label-smaller`}>
-                                    <span aria-hidden='true' className='text-xs font-bold'>
-                                        {letter}−
-                                    </span>
-                                </LegacyControlButton>
-                                <LegacyControlButton
-                                    label={`Bigger ${noun} Labels`}
-                                    disabled={labelSize[kind] >= LABEL_SIZE_MAX}
-                                    onClick={() => changeLabelSize(kind, LABEL_SIZE_STEP)}
-                                    testId={`explore_graph-controls_${kind}-label-bigger`}>
-                                    <span aria-hidden='true' className='text-base font-bold'>
-                                        {letter}+
-                                    </span>
-                                </LegacyControlButton>
-                            </Fragment>
-                        );
-                    })}
+                    <LegacyControlButton
+                        label='Label Sizes'
+                        pressed={!!labelSizeAnchor}
+                        onClick={(event) => setLabelSizeAnchor(event.currentTarget)}
+                        testId='explore_graph-controls_label-sizes'>
+                        <FontAwesomeIcon aria-hidden='true' icon={faTextHeight} />
+                    </LegacyControlButton>
+                    <LegacyControlButton
+                        label='Screenshot (copy to clipboard and save PNG)'
+                        disabled={displayTable}
+                        onClick={pngExport.screenshot}
+                        testId='explore_graph-controls_screenshot'>
+                        <FontAwesomeIcon aria-hidden='true' icon={faCamera} />
+                    </LegacyControlButton>
                 </div>
             </div>
             <GraphItemInformationPanel />
+            <Popover
+                open={!!labelSizeAnchor}
+                anchorEl={labelSizeAnchor}
+                onClose={() => setLabelSizeAnchor(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+                <div className='p-2 flex flex-col gap-1' data-testid='explore_graph-controls_label-sizes-panel'>
+                    {(['node', 'edge'] as const).map((kind) => {
+                        const noun = kind === 'node' ? 'Node' : 'Edge';
+                        return (
+                            <div key={kind} className='flex items-center gap-2'>
+                                <span className='w-24 text-sm'>{noun} labels</span>
+                                <IconButton
+                                    aria-label={`Smaller ${noun} Labels`}
+                                    disabled={labelSize[kind] <= LABEL_SIZE_MIN}
+                                    onClick={() => changeLabelSize(kind, 1 / LABEL_SIZE_STEP)}
+                                    data-testid={`explore_graph-controls_${kind}-label-smaller`}>
+                                    <FontAwesomeIcon aria-hidden='true' icon={faMinus} />
+                                </IconButton>
+                                <span className='w-10 text-center text-sm tabular-nums'>
+                                    {Math.round(labelSize[kind] * 100)}%
+                                </span>
+                                <IconButton
+                                    aria-label={`Bigger ${noun} Labels`}
+                                    disabled={labelSize[kind] >= LABEL_SIZE_MAX}
+                                    onClick={() => changeLabelSize(kind, LABEL_SIZE_STEP)}
+                                    data-testid={`explore_graph-controls_${kind}-label-bigger`}>
+                                    <FontAwesomeIcon aria-hidden='true' icon={faPlus} />
+                                </IconButton>
+                            </div>
+                        );
+                    })}
+                </div>
+            </Popover>
             {pngExport.dialog}
             <EdgeFilterPanel
                 anchorEl={edgeFilterAnchor}

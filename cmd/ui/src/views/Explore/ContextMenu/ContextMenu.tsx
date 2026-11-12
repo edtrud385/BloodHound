@@ -33,7 +33,7 @@ import AssetGroupMenuItem from './AssetGroupMenuItem';
 const ContextMenu: FC<{
     contextMenu: { mouseX: number; mouseY: number } | null;
     handleClose: () => void;
-    /** Extra items shown at the top of the menu (e.g. the Legacy view's expand/collapse). */
+    /** Extra items shown at the bottom of the menu (e.g. the Legacy view's expand/collapse). */
     children?: ReactNode;
 }> = ({ contextMenu, handleClose, children }) => {
     const { primarySearch, secondarySearch, setExploreParams } = useExploreParams();
@@ -76,7 +76,6 @@ const ContextMenu: FC<{
             anchorReference='anchorPosition'
             onClose={handleClose}
             onClick={handleClose}>
-            {children}
             <MenuItem onClick={handleSetStartingNode}>Set as starting node</MenuItem>
             <MenuItem onClick={handleSetEndingNode}>Set as ending node</MenuItem>
 
@@ -94,6 +93,7 @@ const ContextMenu: FC<{
                     />,
                 ]}
             <CopyMenuItem />
+            {children}
         </Menu>
     );
 };

@@ -30,8 +30,8 @@ import {
     PngExportSettings,
     canPickFolder,
     canvasToPng,
-    getPngExportSettings,
     getNextDownloadNumber,
+    getPngExportSettings,
     getSavedFolder,
     pickFolder,
     previewName,
@@ -67,6 +67,40 @@ export const usePngExport = (capture: () => HTMLCanvasElement | undefined) => {
         [capture, addNotification]
     );
 
+    /** Camera button: copy the graph to the clipboard and save it as a PNG, from one capture. */
+    const screenshot = useCallback(async () => {
+        const canvas = capture();
+        if (!canvas || !canvas.width) return;
+        const blob = canvasToPng(canvas);
+        let copied = false;
+        try {
+            // Pass the promise straight in so the copy stays inside the click's user gesture
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            copied = true;
+        } catch (error) {
+            console.error(error);
+        }
+        try {
+            const result = await savePng(await blob, getPngExportSettings());
+            const copyText = copied ? 'Copied to clipboard' : 'Could not copy to clipboard';
+            if (result.saved) {
+                const where = result.folder ? ` to ${result.folder}` : '';
+                const verb = result.downloaded ? 'downloaded' : 'saved';
+                addNotification(`${copyText} and ${verb} ${result.name}${where}`, 'PngScreenshot', {
+                    autoHideDuration: 3000,
+                });
+            } else {
+                addNotification(copyText, 'PngScreenshot', { autoHideDuration: 3000 });
+            }
+        } catch (error) {
+            console.error(error);
+            addNotification(
+                copied ? 'Copied to clipboard, but could not save the PNG.' : 'Could not save the PNG.',
+                'PngScreenshot'
+            );
+        }
+    }, [capture, addNotification]);
+
     const dialog = (
         <PngExportDialog
             open={optionsOpen}
@@ -78,7 +112,7 @@ export const usePngExport = (capture: () => HTMLCanvasElement | undefined) => {
         />
     );
 
-    return { save: () => save(), openOptions: () => setOptionsOpen(true), dialog };
+    return { save: () => save(), screenshot, openOptions: () => setOptionsOpen(true), dialog };
 };
 
 type PngExportDialogProps = {
@@ -144,13 +178,11 @@ const PngExportDialog = ({ open, onClose, onSave }: PngExportDialogProps) => {
                     </div>
                 ) : (
                     <div className='text-sm flex flex-col gap-2' data-testid='png-export-download-note'>
-                        <p>
-                            This browser does not let a web page pick a folder, so each PNG is saved as a download.
-                        </p>
+                        <p>This browser does not let a web page pick a folder, so each PNG is saved as a download.</p>
                         <p>
                             To choose the folder in Firefox, turn on{' '}
-                            <b>Settings &gt; General &gt; Downloads &gt; Always ask you where to save files</b>. The Save box
-                            then opens in the folder you used last, with the numbered name filled in.
+                            <b>Settings &gt; General &gt; Downloads &gt; Always ask you where to save files</b>. The
+                            Save box then opens in the folder you used last, with the numbered name filled in.
                         </p>
                     </div>
                 )}
@@ -206,4 +238,3 @@ const PngExportDialog = ({ open, onClose, onSave }: PngExportDialogProps) => {
         </Dialog>
     );
 };
-
