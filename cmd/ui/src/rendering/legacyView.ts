@@ -178,13 +178,17 @@ export const LABEL_SIZE_STEP = 1.15;
 
 export type LabelKind = 'node' | 'edge';
 
+/** What the size panel can scale: node labels, edge labels, or node icons (with their glyph badges). */
+export type SizeKind = LabelKind | 'icon';
+
 // The node key is the one the single (shared) setting used before, so a saved size carries over
-const LABEL_SIZE_STORAGE_KEYS: Record<LabelKind, string> = {
+const LABEL_SIZE_STORAGE_KEYS: Record<SizeKind, string> = {
     node: 'bh-legacy-view-label-size',
     edge: 'bh-legacy-view-edge-label-size',
+    icon: 'bh-legacy-view-icon-size',
 };
 
-const readStoredLabelSize = (kind: LabelKind): number => {
+const readStoredLabelSize = (kind: SizeKind): number => {
     try {
         const stored = Number(window.localStorage.getItem(LABEL_SIZE_STORAGE_KEYS[kind]));
         return Number.isFinite(stored) && stored > 0 ? stored : 1;
@@ -193,16 +197,16 @@ const readStoredLabelSize = (kind: LabelKind): number => {
     }
 };
 
-const labelSizeMultipliers: Record<LabelKind, number> =
+const labelSizeMultipliers: Record<SizeKind, number> =
     typeof window !== 'undefined'
-        ? { node: readStoredLabelSize('node'), edge: readStoredLabelSize('edge') }
-        : { node: 1, edge: 1 };
+        ? { node: readStoredLabelSize('node'), edge: readStoredLabelSize('edge'), icon: readStoredLabelSize('icon') }
+        : { node: 1, edge: 1, icon: 1 };
 
 /** Current label-size multiplier for node or edge labels (1 = default). */
-export const getLabelSizeMultiplier = (kind: LabelKind = 'node'): number => labelSizeMultipliers[kind];
+export const getLabelSizeMultiplier = (kind: SizeKind = 'node'): number => labelSizeMultipliers[kind];
 
 /** Set a label-size multiplier (clamped) and remember it in this browser. Returns the applied value. */
-export const setLabelSizeMultiplier = (kind: LabelKind, value: number): number => {
+export const setLabelSizeMultiplier = (kind: SizeKind, value: number): number => {
     const applied = Math.min(LABEL_SIZE_MAX, Math.max(LABEL_SIZE_MIN, value));
     labelSizeMultipliers[kind] = applied;
     try {

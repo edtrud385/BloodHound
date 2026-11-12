@@ -67,37 +67,17 @@ export const usePngExport = (capture: () => HTMLCanvasElement | undefined) => {
         [capture, addNotification]
     );
 
-    /** Camera button: copy the graph to the clipboard and save it as a PNG, from one capture. */
+    /** Camera button: copy the graph to the clipboard as a PNG (Export > PNG saves a file). */
     const screenshot = useCallback(async () => {
         const canvas = capture();
         if (!canvas || !canvas.width) return;
-        const blob = canvasToPng(canvas);
-        let copied = false;
         try {
             // Pass the promise straight in so the copy stays inside the click's user gesture
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            copied = true;
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': canvasToPng(canvas) })]);
+            addNotification('Copied graph to clipboard', 'PngScreenshot', { autoHideDuration: 3000 });
         } catch (error) {
             console.error(error);
-        }
-        try {
-            const result = await savePng(await blob, getPngExportSettings());
-            const copyText = copied ? 'Copied to clipboard' : 'Could not copy to clipboard';
-            if (result.saved) {
-                const where = result.folder ? ` to ${result.folder}` : '';
-                const verb = result.downloaded ? 'downloaded' : 'saved';
-                addNotification(`${copyText} and ${verb} ${result.name}${where}`, 'PngScreenshot', {
-                    autoHideDuration: 3000,
-                });
-            } else {
-                addNotification(copyText, 'PngScreenshot', { autoHideDuration: 3000 });
-            }
-        } catch (error) {
-            console.error(error);
-            addNotification(
-                copied ? 'Copied to clipboard, but could not save the PNG.' : 'Could not save the PNG.',
-                'PngScreenshot'
-            );
+            addNotification('Could not copy the graph to the clipboard.', 'PngScreenshot');
         }
     }, [capture, addNotification]);
 

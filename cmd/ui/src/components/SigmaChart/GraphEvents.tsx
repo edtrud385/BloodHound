@@ -43,12 +43,13 @@ import {
 import {
     LABEL_DECLUTTER_RATIO,
     NODE_ICON_SCALE,
-    getGraphBackgroundColor,
     ViewBounds,
     describeCollapsed,
     drawCollapsedBadges,
     getDeclutteredLabels,
+    getGraphBackgroundColor,
     getLabelScale,
+    getLabelSizeMultiplier,
     getNodeSizeBoost,
     parallelCurveScale,
 } from 'src/rendering/legacyView';
@@ -447,7 +448,11 @@ export const GraphEvents = forwardRef(function GraphEvents(
                     ...data,
                     hidden: data.hidden || filteredOutNodes.has(node),
                     // Legacy view: keep a minimum on-screen node size and a readable label size when zoomed out
-                    size: (data.size ?? 0) * getNodeSizeBoost(camera.ratio) * NODE_ICON_SCALE,
+                    size:
+                        (data.size ?? 0) *
+                        getNodeSizeBoost(camera.ratio) *
+                        NODE_ICON_SCALE *
+                        getLabelSizeMultiplier('icon'),
                     labelScale: getLabelScale(inverseSqrtZoomRatio),
                     forceLabel:
                         data.forceLabel &&
