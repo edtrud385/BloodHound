@@ -70,7 +70,7 @@ import {
     LABEL_SIZE_MAX,
     LABEL_SIZE_MIN,
     LABEL_SIZE_STEP,
-    LabelKind,
+    SizeKind,
     expandCollapsed,
     findCollapsedParent,
     getCollapsedCount,
@@ -263,11 +263,12 @@ const GraphView: FC = () => {
 
     /* Legacy view: separate node and edge label size controls (like Legacy's Node / Edge settings), remembered in this browser */
     const [labelSizeAnchor, setLabelSizeAnchor] = useState<HTMLElement | null>(null);
-    const [labelSize, setLabelSize] = useState<Record<LabelKind, number>>(() => ({
+    const [labelSize, setLabelSize] = useState<Record<SizeKind, number>>(() => ({
         node: getLabelSizeMultiplier('node'),
         edge: getLabelSizeMultiplier('edge'),
+        icon: getLabelSizeMultiplier('icon'),
     }));
-    const changeLabelSize = useCallback((kind: LabelKind, factor: number) => {
+    const changeLabelSize = useCallback((kind: SizeKind, factor: number) => {
         const applied = setLabelSizeMultiplier(kind, getLabelSizeMultiplier(kind) * factor);
         setLabelSize((current) => ({ ...current, [kind]: applied }));
         sigmaChartRef.current?.refresh();
@@ -478,14 +479,14 @@ const GraphView: FC = () => {
                         <FontAwesomeIcon aria-hidden='true' icon={faRoute} />
                     </LegacyControlButton>
                     <LegacyControlButton
-                        label='Label Sizes'
+                        label='Label and Icon Sizes'
                         pressed={!!labelSizeAnchor}
                         onClick={(event) => setLabelSizeAnchor(event.currentTarget)}
                         testId='explore_graph-controls_label-sizes'>
                         <FontAwesomeIcon aria-hidden='true' icon={faTextHeight} />
                     </LegacyControlButton>
                     <LegacyControlButton
-                        label='Screenshot (copy to clipboard and save PNG)'
+                        label='Copy Graph to Clipboard'
                         disabled={displayTable}
                         onClick={pngExport.screenshot}
                         testId='explore_graph-controls_screenshot'>
@@ -501,26 +502,27 @@ const GraphView: FC = () => {
                 anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
                 transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 <div className='p-2 flex flex-col gap-1' data-testid='explore_graph-controls_label-sizes-panel'>
-                    {(['node', 'edge'] as const).map((kind) => {
-                        const noun = kind === 'node' ? 'Node' : 'Edge';
+                    {(['node', 'edge', 'icon'] as const).map((kind) => {
+                        const name = { node: 'Node labels', edge: 'Edge labels', icon: 'Node icons' }[kind];
+                        const testId = kind === 'icon' ? 'icon-size' : `${kind}-label`;
                         return (
                             <div key={kind} className='flex items-center gap-2'>
-                                <span className='w-24 text-sm'>{noun} labels</span>
+                                <span className='w-24 text-sm'>{name}</span>
                                 <IconButton
-                                    aria-label={`Smaller ${noun} Labels`}
+                                    aria-label={`Smaller ${name}`}
                                     disabled={labelSize[kind] <= LABEL_SIZE_MIN}
                                     onClick={() => changeLabelSize(kind, 1 / LABEL_SIZE_STEP)}
-                                    data-testid={`explore_graph-controls_${kind}-label-smaller`}>
+                                    data-testid={`explore_graph-controls_${testId}-smaller`}>
                                     <FontAwesomeIcon aria-hidden='true' icon={faMinus} />
                                 </IconButton>
                                 <span className='w-10 text-center text-sm tabular-nums'>
                                     {Math.round(labelSize[kind] * 100)}%
                                 </span>
                                 <IconButton
-                                    aria-label={`Bigger ${noun} Labels`}
+                                    aria-label={`Bigger ${name}`}
                                     disabled={labelSize[kind] >= LABEL_SIZE_MAX}
                                     onClick={() => changeLabelSize(kind, LABEL_SIZE_STEP)}
-                                    data-testid={`explore_graph-controls_${kind}-label-bigger`}>
+                                    data-testid={`explore_graph-controls_${testId}-bigger`}>
                                     <FontAwesomeIcon aria-hidden='true' icon={faPlus} />
                                 </IconButton>
                             </div>
