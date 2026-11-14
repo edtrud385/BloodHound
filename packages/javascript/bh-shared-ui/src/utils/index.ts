@@ -32,6 +32,7 @@ export * from './freeIconsList';
 export * from './icons';
 export * from './jobs';
 export * from './luxon';
+export * from './nodeExclusion';
 export * from './number';
 export * from './numberFormatting';
 export * from './object';

@@ -140,6 +140,8 @@ export type NodeParams = {
     label?: string;
     source?: string;
     kind?: string;
+    /** The object's objectid (used by Exclude from query). */
+    objectid?: string;
     glyphs?: Glyph[];
     forceLabel?: boolean;
     hidden?: boolean;

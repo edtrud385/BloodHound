@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import isEmpty from 'lodash/isEmpty';
-import { apiClient, applyEdgeFilterToQuery } from '../../../utils';
+import { apiClient, applyEdgeFilterToQuery, applyNodeExclusionsToQuery } from '../../../utils';
 import { ExploreQueryParams } from '../../useExploreParams';
 import { UserSettings } from '../useExploreGraph';
 import { decodeCypherQuery } from '../utils';
@@ -33,7 +33,9 @@ export const cypherSearchGraphQuery = (
     paramOptions: Partial<ExploreQueryParams>,
     userSettings: UserSettings,
     /** Edge kinds to strip from the query's edge-type lists (Legacy's "Apply filter to every query"). */
-    queryHiddenEdgeKinds: string[] = []
+    queryHiddenEdgeKinds: string[] = [],
+    /** objectids filtered out of every MATCH clause (right-click > Exclude from query). */
+    excludedObjectIds: string[] = []
 ): ExploreGraphQueryOptions => {
     const { searchType, cypherSearch } = paramOptions;
 
@@ -41,7 +43,10 @@ export const cypherSearchGraphQuery = (
         return { enabled: false };
     }
 
-    const decoded = applyEdgeFilterToQuery(decodeCypherQuery(cypherSearch), queryHiddenEdgeKinds);
+    const decoded = applyNodeExclusionsToQuery(
+        applyEdgeFilterToQuery(decodeCypherQuery(cypherSearch), queryHiddenEdgeKinds),
+        excludedObjectIds
+    );
 
     const queryKey = [
         ExploreGraphQueryKey,
@@ -49,6 +54,7 @@ export const cypherSearchGraphQuery = (
         cypherSearch,
         userSettings.headers?.Prefer,
         queryHiddenEdgeKinds.join('|'),
+        excludedObjectIds.join('|'),
     ];
 
     const includeProperties = true;
@@ -98,10 +104,12 @@ const getCypherErrorMessage = (error: any): ExploreGraphQueryError => {
 export const cypherSearchQuery = (
     paramOptions: Partial<ExploreQueryParams>,
     userSettings: UserSettings,
-    queryHiddenEdgeKinds: string[] = []
+    queryHiddenEdgeKinds: string[] = [],
+    excludedObjectIds: string[] = []
 ): ExploreGraphQuery => {
     return {
-        getQueryConfig: () => cypherSearchGraphQuery(paramOptions, userSettings, queryHiddenEdgeKinds),
+        getQueryConfig: () =>
+            cypherSearchGraphQuery(paramOptions, userSettings, queryHiddenEdgeKinds, excludedObjectIds),
         getErrorMessage: getCypherErrorMessage,
     };
 };

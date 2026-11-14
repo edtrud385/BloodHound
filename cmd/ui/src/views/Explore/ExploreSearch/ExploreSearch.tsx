@@ -27,6 +27,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Tab, Tabs } from '@mui/material';
 import {
     CypherSearch,
+    ExcludedNodesButton,
     ExploreQueryParams,
     ExploreSearchTab,
     MappedStringLiteral,
@@ -250,6 +251,7 @@ const ExploreSearch: React.FC<ExploreSearchProps> = ({ onOpenEdgeFilter }) => {
                         />
                     ))}
                 </Tabs>
+                <ExcludedNodesButton compact />
                 <IconButton
                     aria-label='Back to the previous graph'
                     title='Back to the previous graph'

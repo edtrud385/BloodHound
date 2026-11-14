@@ -99,6 +99,21 @@ show up. Single-type patterns such as `-[:HasSession]->` are left as written. On
 the same once for the current query, without switching that option on. The current ticks can be
 saved as named **views**. The filter and views are kept in your browser.
 
+## Exclude from query
+
+**Right-click a node → Exclude from query** takes that object out of every Cypher query and re-runs the
+current one. Named paths are filtered as a whole (`WHERE NONE(excluded_node IN nodes(p) WHERE
+excluded_node.objectid IN [...])`), so shortest paths go around the excluded object; patterns without a path name
+filter each named node (`NOT n.objectid IN [...]`). An existing `WHERE` is kept and the filter is ANDed to it. The
+editor keeps the query as written: the filter is added when the query runs, like the edge filter's.
+
+The **Excluded (n)** button next to Tag / Save on the Cypher tab lists the excluded objects (by name, matched by
+objectid), each with an × to bring it back, and **Clear all**. While anything is excluded, an eye-slash icon with
+the count also shows in the Search / Pathfinding / Cypher tab bar (it opens the same list), so it stays visible
+when the search panel is collapsed. The list is kept in your browser and stays on for the next query. Excluded
+objects are also hidden in the drawn graph, which covers node search, pathfinding (which do not run your Cypher)
+and patterns the rewrite cannot reach (only anonymous nodes, such as `(:User)`).
+
 ## Large queries (server config, no code change)
 
 CE has no row cap on Cypher results. Large queries are cut off by three server limits, all
