@@ -198,6 +198,7 @@ const initGraphNodes = (
             label: node.label,
             source: getNodeSource(node.kinds),
             kind: node.kind,
+            objectid: node.objectId,
             forceLabel: true,
             hidden: hideNodes,
             ...themedOptions.labels,

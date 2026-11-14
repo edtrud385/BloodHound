@@ -32,6 +32,7 @@ import {
     WebGLDisabledAlert,
     baseGraphLayouts,
     defaultGraphLayout,
+    excludeNode,
     glyphUtils,
     isNodeResponse,
     isWebGLEnabled,
@@ -235,8 +236,23 @@ const GraphView: FC = () => {
     const contextMenuExpandedCount = contextMenuNode
         ? getExpandedCount(graphologyGraph!.getNodeAttributes(contextMenuNode))
         : 0;
+    const contextMenuNodeAttributes = contextMenuNode ? graphologyGraph!.getNodeAttributes(contextMenuNode) : null;
     const legacyContextMenuItems = contextMenuNode
         ? [
+              contextMenuNodeAttributes?.objectid && (
+                  <MenuItem
+                      key='legacy-exclude'
+                      data-testid='explore_context-menu_exclude'
+                      onClick={() => {
+                          excludeNode({
+                              objectid: contextMenuNodeAttributes.objectid,
+                              name: contextMenuNodeAttributes.label ?? contextMenuNodeAttributes.objectid,
+                              kind: contextMenuNodeAttributes.kind,
+                          });
+                      }}>
+                      Exclude from query
+                  </MenuItem>
+              ),
               contextMenuCollapsedCount > 0 && (
                   <MenuItem
                       key='legacy-expand'

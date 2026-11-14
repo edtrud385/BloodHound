@@ -14,10 +14,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 import { RelationshipDetailsWithInfo } from 'js-client-library';
+import { useMemo } from 'react';
 import { useQuery } from 'react-query';
 import { SNACKBAR_DURATION_LONG } from '../../constants';
 import { useNotifications } from '../../providers';
 import { getQueryHiddenEdgeKinds, useEdgeFilter } from '../../utils/edgeViewFilter';
+import { useNodeExclusions } from '../../utils/nodeExclusion';
 import { useTimeoutLimitConfiguration } from '../useConfiguration';
 import { ExploreQueryParams, useExploreParams } from '../useExploreParams';
 import { isRelationshipResponse, useGraphItem } from '../useGraphItem';
@@ -39,10 +41,12 @@ export function exploreGraphQueryFactory(
         userSettings,
         relationshipDetails,
         queryHiddenEdgeKinds = [],
+        excludedObjectIds = [],
     }: {
         userSettings: UserSettings;
         relationshipDetails?: RelationshipDetailsWithInfo;
         queryHiddenEdgeKinds?: string[];
+        excludedObjectIds?: string[];
     }
 ): ExploreGraphQuery {
     switch (paramOptions.searchType) {
@@ -55,7 +59,7 @@ export function exploreGraphQueryFactory(
         case 'composition':
             return compositionSearchQuery(paramOptions, relationshipDetails);
         case 'cypher':
-            return cypherSearchQuery(paramOptions, userSettings, queryHiddenEdgeKinds);
+            return cypherSearchQuery(paramOptions, userSettings, queryHiddenEdgeKinds, excludedObjectIds);
         case 'aclinheritance':
             return aclInheritanceSearchQuery(paramOptions, relationshipDetails);
         default:
@@ -79,7 +83,16 @@ export const useExploreGraph = (options: ExploreGraphQueryOptions = {}) => {
     const edgeFilter = useEdgeFilter();
     const queryHiddenEdgeKinds = getQueryHiddenEdgeKinds(edgeFilter, params.cypherSearch);
 
-    const query = exploreGraphQueryFactory(params, { userSettings, relationshipDetails, queryHiddenEdgeKinds });
+    // Objects excluded with right-click > Exclude from query are filtered out of every Cypher query
+    const { excluded } = useNodeExclusions();
+    const excludedObjectIds = useMemo(() => excluded.map((node) => node.objectid), [excluded]);
+
+    const query = exploreGraphQueryFactory(params, {
+        userSettings,
+        relationshipDetails,
+        queryHiddenEdgeKinds,
+        excludedObjectIds,
+    });
 
     const queryConfig = query.getQueryConfig();
 

@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useRegisterEvents, useSetSettings, useSigma } from '@react-sigma/core';
-import { useEdgeFilter, useTheme } from 'bh-shared-ui';
+import { useEdgeFilter, useNodeExclusions, useTheme } from 'bh-shared-ui';
 import type { Attributes } from 'graphology-types';
 import {
     forwardRef,
@@ -400,8 +400,17 @@ export const GraphEvents = forwardRef(function GraphEvents(
     // Legacy-style edge filter (display): hide edges of unticked kinds, and optionally the nodes they leave alone
     const edgeFilter = useEdgeFilter();
     const hiddenEdgeKinds = useMemo(() => new Set(edgeFilter.hiddenKinds), [edgeFilter.hiddenKinds]);
+    // Objects excluded with right-click > Exclude from query are hidden too: that covers searches that don't
+    // run the Cypher query (node search, pathfinding) and patterns the query rewrite can't reach
+    const { excluded } = useNodeExclusions();
+    const excludedObjectIds = useMemo(() => new Set(excluded.map((node) => node.objectid)), [excluded]);
     const filteredOutNodes = useMemo(() => {
         const out = new Set<string>();
+        if (excludedObjectIds.size) {
+            graph.forEachNode((node, attrs) => {
+                if (attrs.objectid && excludedObjectIds.has(attrs.objectid)) out.add(node);
+            });
+        }
         if (!edgeFilter.hideOrphans || hiddenEdgeKinds.size === 0) return out;
         graph.forEachNode((node) => {
             if (graph.degree(node) === 0) return; // nodes that never had an edge stay
@@ -410,7 +419,7 @@ export const GraphEvents = forwardRef(function GraphEvents(
         });
         return out;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [graph, hiddenEdgeKinds, edgeFilter.hideOrphans, layoutVersion]);
+    }, [graph, hiddenEdgeKinds, edgeFilter.hideOrphans, excludedObjectIds, layoutVersion]);
 
     const isHighlightedItemInGraph = useMemo(
         () => getIsHighlightedItemInGraph(graph, highlightedItem),

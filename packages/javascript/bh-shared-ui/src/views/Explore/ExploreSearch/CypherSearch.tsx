@@ -38,6 +38,7 @@ import { useCypherSchema } from '../../../hooks/useGraphKinds';
 import { useNotifications } from '../../../providers';
 import { Permission, adaptClickHandlerToKeyDown, cn } from '../../../utils';
 import { SavedQueriesProvider, useSavedQueriesContext } from '../providers';
+import ExcludedNodesButton from './ExcludedNodesButton';
 import CommonSearches from './SavedQueries/CommonSearches';
 import CypherSearchMessage, { MessageState } from './SavedQueries/CypherSearchMessage';
 import SaveQueryActionMenu from './SavedQueries/SaveQueryActionMenu';
@@ -368,6 +369,7 @@ const CypherSearchInner = ({
                         </div>
 
                         <div className='flex gap-2 justify-end'>
+                            <ExcludedNodesButton />
                             {checkPermission(Permission.GRAPH_DB_WRITE) && privilegeZonesEnabled && (
                                 <TagToZoneLabel cypherQuery={cypherSearchState.cypherQuery}></TagToZoneLabel>
                             )}
