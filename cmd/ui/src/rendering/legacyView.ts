@@ -247,6 +247,22 @@ export const getNodeSizeBoost = (cameraRatio: number): number => {
     return Math.max(1, cameraRatio * floorFactor);
 };
 
+/** Grab margin around a node's drawn circle, in pixels, so small icons are still easy to pick up. */
+export const NODE_HIT_MARGIN_PX = 2;
+
+/**
+ * Radius in pixels in which a press picks up a node. Sigma tests against `size / sqrt(ratio)`, but the
+ * node program draws the circle at about `size / ratio` (radius ≈ 2·size/ratio/2.1), so once zoomed out
+ * sigma's hit circle is √ratio times the icon. With Legacy's boosted icon sizes on a large graph those
+ * invisible circles cover the empty space, and every drag grabs a node instead of moving the view.
+ * `sigmaRadius` is the radius sigma passes in (size / sqrt(ratio)).
+ */
+export const getNodeHitRadius = (sigmaRadius: number, cameraRatio: number): number => {
+    const ratio = cameraRatio > 0 ? cameraRatio : 1;
+    const drawn = (sigmaRadius * Math.sqrt(ratio) * 2) / 2.1 / ratio;
+    return drawn + NODE_HIT_MARGIN_PX;
+};
+
 /**
  * Label scale (font size; opacity uses it too). LABEL_MIN_SCALE at the fitted view, growing smoothly
  * as you zoom in (Legacy-like), never smaller than CE's own size, times the user's label-size setting

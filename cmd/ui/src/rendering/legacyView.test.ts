@@ -16,9 +16,11 @@
 
 import {
     EDGE_LABEL_SIZE,
-    NODE_LABEL_SIZE,
     getLabelScale,
     getLabelSizeMultiplier,
+    getNodeHitRadius,
+    NODE_HIT_MARGIN_PX,
+    NODE_LABEL_SIZE,
     setLabelSizeMultiplier,
     shortenNodeLabel,
 } from './legacyView';
@@ -100,5 +102,18 @@ describe('graph background', () => {
         expect(getGraphBackgroundColor(' #fff ')).toBe(LIGHT_GRAPH_BACKGROUND);
         expect(getGraphBackgroundColor('rgb(255, 255, 255)')).toBe(LIGHT_GRAPH_BACKGROUND);
         expect(getGraphBackgroundColor('#121212')).toBe('#121212');
+    });
+});
+
+describe('getNodeHitRadius', () => {
+    it('matches the drawn circle (plus a small margin) instead of growing with zoom-out', () => {
+        // Sigma passes size / sqrt(ratio); the circle is drawn at about size / ratio
+        const size = 30;
+        for (const ratio of [1, 4, 25, 100]) {
+            const drawn = (2 * size) / ratio / 2.1;
+            expect(getNodeHitRadius(size / Math.sqrt(ratio), ratio)).toBeCloseTo(drawn + NODE_HIT_MARGIN_PX);
+        }
+        // At ratio 25 sigma's own circle would be 5x the icon
+        expect(getNodeHitRadius(30 / 5, 25)).toBeLessThan(30 / 5 / 1.5);
     });
 });

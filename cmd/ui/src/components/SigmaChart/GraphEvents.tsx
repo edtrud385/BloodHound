@@ -50,6 +50,7 @@ import {
     getGraphBackgroundColor,
     getLabelScale,
     getLabelSizeMultiplier,
+    getNodeHitRadius,
     getNodeSizeBoost,
     parallelCurveScale,
 } from 'src/rendering/legacyView';
@@ -535,6 +536,21 @@ export const GraphEvents = forwardRef(function GraphEvents(
         isExploreGraphHighlight,
         isExploreGraphLabelClip,
     ]);
+
+    // Legacy view: pick nodes only where they are drawn. Sigma's own hit circle grows with sqrt(zoom-out)
+    // past the icon, so on a large zoomed-out graph a press on empty space grabbed a node instead of panning.
+    useEffect(() => {
+        const target = sigma as unknown as {
+            mouseIsOnNode: (mouse: Coordinates, node: Coordinates, size: number) => boolean;
+        };
+        const original = target.mouseIsOnNode;
+        target.mouseIsOnNode = function (mouse, node, size) {
+            return original.call(this, mouse, node, getNodeHitRadius(size, sigma.getCamera().ratio));
+        };
+        return () => {
+            target.mouseIsOnNode = original;
+        };
+    }, [sigma]);
 
     // Legacy view: draw the count bubble on nodes with collapsed leaves after every render
     useEffect(() => {
