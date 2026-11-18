@@ -95,7 +95,10 @@ editor keeps the query as written: the filter is added when the query runs, like
 The **Excluded (n)** button next to Tag / Save on the Cypher tab lists the excluded objects (by name, matched by
 objectid), each with an × to bring it back, and **Clear all**. While anything is excluded, an eye-slash icon with
 the count also shows in the Search / Pathfinding / Cypher tab bar (it opens the same list), so it stays visible
-when the search panel is collapsed. The list is kept in your browser and stays on for the next query. Excluded
+when the search panel is collapsed. The list stays on for the next query and is kept in your browser per
+BloodHound instance: every engagement stack is served from localhost:8080, so the list is keyed to the logged-in
+user's id, which is new in every new stack. A new engagement starts with an empty list. (Edge filter views and
+label/icon sizes stay shared across engagements.) Excluded
 objects are also hidden in the drawn graph, which covers node search, pathfinding (which do not run your Cypher)
 and patterns the rewrite cannot reach (only anonymous nodes, such as `(:User)`).
 

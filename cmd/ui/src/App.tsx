@@ -26,6 +26,7 @@ import {
     darkPalette,
     lightPalette,
     reactRouterFutureFlags,
+    setNodeExclusionScope,
     setRootClass,
     themeZIndex,
     themedComponents,
@@ -35,7 +36,7 @@ import {
     useStyles,
 } from 'bh-shared-ui';
 import { createBrowserHistory } from 'history';
-import React, { useEffect } from 'react';
+import React, { useEffect, useLayoutEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { unstable_HistoryRouter as BrowserRouter } from 'react-router-dom';
@@ -92,6 +93,12 @@ export const Inner: React.FC = () => {
             initializeBHEClient();
         }
     }, [dispatch, authState.isInitialized]);
+
+    // Exclude from query: keep the exclusion list per BloodHound instance (every engagement stack is served
+    // from the same address, and a new stack has a new database, so a new user id). A layout effect runs
+    // before the Explore page's queries start, so the first query already uses this instance's list.
+    const userId = authState.user?.id;
+    useLayoutEffect(() => setNodeExclusionScope(userId), [userId]);
 
     // block rendering until authentication initialization is complete
     if (!authState.isInitialized) {

@@ -15,12 +15,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /*
- * Objects excluded from Explore queries (right-click > Exclude from query), kept in this browser.
+ * Objects excluded from Explore queries (right-click > Exclude from query), kept in this browser per
+ * BloodHound instance.
  *
  *  - Query: while the list is not empty, every Cypher query is run with the excluded objects filtered out
  *    of its MATCH clauses (by objectid), so shortest paths are found around them.
  *  - Display: excluded objects are also hidden in the drawn graph, which covers searches that do not run
  *    the Cypher query (node search, pathfinding) and patterns the rewrite cannot reach.
+ *  - Scope: every engagement stack is served from the same address (localhost:8080), so browser storage
+ *    alone would share one list across engagements. The list is therefore kept per scope, set by the app
+ *    to the logged-in user's id (a new stack has a new database, so a new user id). Without a scope the
+ *    list is empty and nothing is saved.
  */
 
 import { useSyncExternalStore } from 'react';
@@ -29,32 +34,61 @@ export type ExcludedNode = { objectid: string; name: string; kind?: string };
 
 export type NodeExclusionState = { excluded: ExcludedNode[] };
 
-const STORAGE_KEY = 'bh-node-exclusions';
+const STORAGE_KEY = 'bh-node-exclusions-by-instance';
+/** The first version kept one list for every engagement; it can't be attributed to one, so it is dropped. */
+const LEGACY_STORAGE_KEY = 'bh-node-exclusions';
 
-const load = (): NodeExclusionState => {
+const EMPTY: NodeExclusionState = { excluded: [] };
+
+const readAll = (): Record<string, ExcludedNode[]> => {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : null;
-        const excluded = Array.isArray(parsed?.excluded)
-            ? parsed.excluded.filter((n: any) => n && typeof n.objectid === 'string' && n.objectid)
-            : [];
-        return { excluded };
+        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
     } catch {
-        return { excluded: [] };
+        return {};
     }
 };
 
-let state: NodeExclusionState = load();
+const load = (scope: string): NodeExclusionState => {
+    const list = readAll()[scope];
+    return {
+        excluded: Array.isArray(list) ? list.filter((n: any) => n && typeof n.objectid === 'string' && n.objectid) : [],
+    };
+};
+
+let scope: string | null = null;
+let state: NodeExclusionState = EMPTY;
 const listeners = new Set<() => void>();
+const notify = () => listeners.forEach((listener) => listener());
+
+try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+} catch {
+    // storage unavailable
+}
+
+/** Pick whose list is shown and used: the app passes the logged-in user's id (undefined when logged out). */
+export const setNodeExclusionScope = (next?: string | null) => {
+    const normalized = next || null;
+    if (normalized === scope) return;
+    scope = normalized;
+    state = scope ? load(scope) : EMPTY;
+    notify();
+};
 
 const commit = (next: NodeExclusionState) => {
     state = next;
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-        // storage unavailable (private window): the list just isn't remembered
+    if (scope) {
+        try {
+            const all = readAll();
+            if (next.excluded.length) all[scope] = next.excluded;
+            else delete all[scope];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+        } catch {
+            // storage unavailable (private window): the list just isn't remembered
+        }
     }
-    listeners.forEach((listener) => listener());
+    notify();
 };
 
 export const getNodeExclusionState = (): NodeExclusionState => state;

@@ -21,6 +21,7 @@ import {
     getNodeExclusionState,
     includeNode,
     isNodeExcluded,
+    setNodeExclusionScope,
 } from './nodeExclusion';
 
 const ID = 'S-1-5-21-1-2-3-512';
@@ -95,7 +96,18 @@ describe('applyNodeExclusionsToQuery', () => {
 });
 
 describe('node exclusion list', () => {
-    beforeEach(() => clearNodeExclusions());
+    beforeEach(() => {
+        setNodeExclusionScope('instance-a');
+        clearNodeExclusions();
+    });
+
+    it('keeps a separate list per instance', () => {
+        excludeNode({ objectid: ID, name: 'DOMAIN ADMINS@CONTOSO.LOCAL' });
+        setNodeExclusionScope('instance-b');
+        expect(getNodeExclusionState().excluded).toHaveLength(0);
+        setNodeExclusionScope(undefined);
+        expect(getNodeExclusionState().excluded).toHaveLength(0);
+    });
 
     it('adds each object once and removes it again', () => {
         excludeNode({ objectid: ID, name: 'DOMAIN ADMINS@CONTOSO.LOCAL', kind: 'Group' });
