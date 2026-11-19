@@ -93,10 +93,13 @@ ENV VERSION_PKG="github.com/specterops/bloodhound/cmd/api/src/version"
 RUN apk add --update --no-cache git
 WORKDIR /build
 COPY .git ./.git
+# Set to stamp a version such as v9.8.0-legacy instead of the newest v*.*.* tag in .git
+ARG BH_VERSION=""
 
 # sort by semver version to grab latest and convert to required ldflags
 # (see https://git-scm.com/docs/git-config#Documentation/git-config.txt-versionsortsuffix)
-RUN git --no-pager -c 'versionsort.suffix=-rc' tag --list v*.*.* --sort=-v:refname | head -n 1 | sed 's/^v//' | awk \
+RUN { if [ -n "$BH_VERSION" ]; then echo "$BH_VERSION"; \
+  else git --no-pager -c 'versionsort.suffix=-rc' tag --list v*.*.* --sort=-v:refname | head -n 1; fi; } | sed 's/^v//' | awk \
   -F'[.+-]' \
   -v pkg="$VERSION_PKG" \
   '{ major = $1; minor = $2; patch = $3; pre = ""; if ($4) pre = $4; \

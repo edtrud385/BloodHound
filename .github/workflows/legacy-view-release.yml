@@ -1,0 +1,186 @@
+name: Legacy View Release
+
+# Builds the legacy-view server for every platform plus ready-to-load Docker
+# images, and publishes them as a GitHub Release.
+#
+# "Run workflow" on the Actions tab with "tag" filled in (e.g. v9.8.0-legacy.1)
+# builds everything, creates that tag on the commit being built and publishes
+# the release. Leave "tag" empty to only build the files as workflow artifacts.
+# Pushing a tag like v9.8.0-legacy.1 does the same as filling in "tag".
+# The release text comes from docs/release-notes/<tag>.md when that file exists.
+on:
+  push:
+    tags:
+      - "v*-legacy*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create, e.g. v9.8.0-legacy.1 (leave empty to only build artifacts)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || '' }}
+  # Version stamped into the server (shown in the UI). Test builds get a dev version.
+  BH_VERSION: ${{ inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v9.8.0-dev' }}
+
+jobs:
+  ui:
+    name: Build UI
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install and build
+      run: |
+        corepack enable
+        yarn install --immutable
+        yarn build
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ui-dist
+        path: cmd/ui/dist
+        retention-days: 1
+
+  server:
+    name: Server (${{ matrix.os }} ${{ matrix.arch }})
+    needs: ui
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, darwin, windows]
+        arch: [amd64, arm64]
+    env:
+      NAME: bloodhound-legacy-view-${{ matrix.os }}-${{ matrix.arch }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+        cache-dependency-path: go.sum
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: ui-dist
+        path: cmd/api/src/api/static/assets
+
+    - name: Build
+      env:
+        CGO_ENABLED: "0"
+        GOOS: ${{ matrix.os }}
+        GOARCH: ${{ matrix.arch }}
+      run: |
+        # Same version ldflags as dockerfiles/bloodhound.Dockerfile
+        LDFLAGS=$(echo "$BH_VERSION" | sed 's/^v//' | awk -F'[.+-]' \
+          -v pkg="github.com/specterops/bloodhound/cmd/api/src/version" \
+          '{ printf("-X %s.majorVersion=%s -X %s.minorVersion=%s -X %s.patchVersion=%s", pkg, $1, pkg, $2, pkg, $3); \
+             if ($4) printf(" -X %s.prereleaseVersion=%s", pkg, $4) }')
+        EXT=""; [ "$GOOS" = windows ] && EXT=".exe"
+        mkdir -p "$NAME"
+        go build -C cmd/api/src -trimpath -ldflags "-s -w $LDFLAGS" \
+          -o "$GITHUB_WORKSPACE/$NAME/bloodhound$EXT" github.com/specterops/bloodhound/cmd/api/src/cmd/bhapi
+        cp examples/docker-compose/bloodhound.config.json "$NAME/"
+        cp LICENSE "$NAME/"
+        zip -qry "$NAME.zip" "$NAME"
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.NAME }}
+        path: ${{ env.NAME }}.zip
+
+  image:
+    name: Docker image (linux ${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    env:
+      NAME: bloodhound-legacy-view-image-linux-${{ matrix.arch }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: docker/setup-buildx-action@v3
+
+    # The build stages run natively and cross-compile, so arm64 needs no emulation.
+    # Collectors are left out so the saved image is not flagged by scanners.
+    - name: Build image
+      run: |
+        IMAGE_TAG=${TAG:-dev}
+        docker buildx build \
+          -f dockerfiles/bloodhound.Dockerfile \
+          --target bloodhound \
+          --platform linux/${{ matrix.arch }} \
+          --build-arg BH_VERSION="$BH_VERSION" \
+          --build-arg INCLUDE_COLLECTORS=no \
+          -t "bloodhound-legacy-view:$IMAGE_TAG" \
+          -t bloodhound-legacy-view:latest \
+          --output type=docker,dest="$NAME.tar" \
+          .
+        gzip -9 "$NAME.tar"
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.NAME }}
+        path: ${{ env.NAME }}.tar.gz
+
+  compose:
+    name: Compose file
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Point the example compose file at the legacy-view image
+      run: |
+        mkdir -p out
+        sed 's#docker.io/specterops/bloodhound:\${BLOODHOUND_TAG:-latest}#bloodhound-legacy-view:${BLOODHOUND_TAG:-latest}#' \
+          examples/docker-compose/docker-compose.yml > out/docker-compose.yml
+        grep -q 'image: bloodhound-legacy-view:' out/docker-compose.yml
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: docker-compose
+        path: out/docker-compose.yml
+
+  # One job publishes the release after everything has built, so the tag and
+  # release are created once, and only when all builds succeeded.
+  release:
+    needs: [server, image, compose]
+    if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/download-artifact@v4
+      with:
+        path: dist
+
+    - name: Release notes
+      id: notes
+      run: |
+        if [ -f "docs/release-notes/$TAG.md" ]; then
+          echo "path=docs/release-notes/$TAG.md" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Publish release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.TAG }}
+        target_commitish: ${{ github.sha }}
+        name: Legacy View ${{ env.TAG }}
+        body_path: ${{ steps.notes.outputs.path }}
+        make_latest: true
+        files: |
+          dist/bloodhound-legacy-view-*/*.zip
+          dist/bloodhound-legacy-view-image-*/*.tar.gz
+          dist/docker-compose/docker-compose.yml

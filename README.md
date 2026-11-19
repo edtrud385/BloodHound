@@ -14,7 +14,9 @@ BloodHound Legacy draws the same kind of data far more legibly: left to right, s
 
 ## Getting it
 
-Build the normal CE image from the `legacy-view` branch and use it in place of `specterops/bloodhound` in your compose file:
+The [Releases](https://github.com/edtrud385/BloodHound/releases) page has ready-made Docker images (load one with `docker load -i` and start it with the `docker-compose.yml` attached to the release) and server binaries for Linux, macOS and Windows. They are built by `.github/workflows/legacy-view-release.yml`.
+
+To build it yourself, build the normal CE image from the `legacy-view` branch and use it in place of `specterops/bloodhound` in your compose file:
 
 ```bash
 git clone -b legacy-view https://github.com/edtrud385/BloodHound.git
