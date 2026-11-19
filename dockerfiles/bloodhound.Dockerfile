@@ -21,6 +21,9 @@
 ################
 ARG SHARPHOUND_VERSION=v2.17.0
 ARG AZUREHOUND_VERSION=v3.1.1
+# "no" leaves the SharpHound/AzureHound downloads out of the image (Download Collectors is then empty).
+# Antivirus and cloud-storage scanners flag the SharpHound zip, which blocks sharing a saved image.
+ARG INCLUDE_COLLECTORS=yes
 
 ########
 # Package remote assets
@@ -56,6 +59,19 @@ RUN 7z x '*.zip' -oartifacts/*
 WORKDIR /tmp/azurehound/artifacts
 RUN 7z a -tzip -mx9 azurehound-${AZUREHOUND_VERSION}.zip *
 RUN sha256sum azurehound-${AZUREHOUND_VERSION}.zip > azurehound-${AZUREHOUND_VERSION}.zip.sha256
+
+# Collector files for the final image: with INCLUDE_COLLECTORS=no only the empty folders
+FROM --platform=$BUILDPLATFORM docker.io/library/alpine:3.20 AS collectors-no
+RUN mkdir -p /out/sharphound /out/azurehound
+
+FROM hound-builder AS collectors-yes
+ARG SHARPHOUND_VERSION
+ARG AZUREHOUND_VERSION
+RUN mkdir -p /out/sharphound /out/azurehound \
+  && cp /tmp/sharphound/sharphound-${SHARPHOUND_VERSION}.zip /tmp/sharphound/sharphound-${SHARPHOUND_VERSION}.zip.sha256 /out/sharphound/ \
+  && cp /tmp/azurehound/artifacts/azurehound-${AZUREHOUND_VERSION}.zip /tmp/azurehound/artifacts/azurehound-${AZUREHOUND_VERSION}.zip.sha256 /out/azurehound/
+
+FROM collectors-${INCLUDE_COLLECTORS} AS collectors
 
 ########
 # UI Build
@@ -123,9 +139,6 @@ COPY dockerfiles/configs/bloodhound.config.json /bloodhound.config.json
 
 # api/v2/collectors/[collector-type]/[version] for collector download specifically expects
 # '[collector-type]-[version].zip(.sha256)' - all lowercase for embedded files
-COPY --from=hound-builder /tmp/sharphound/sharphound-${SHARPHOUND_VERSION}.zip /etc/bloodhound/collectors/sharphound/
-COPY --from=hound-builder /tmp/sharphound/sharphound-${SHARPHOUND_VERSION}.zip.sha256 /etc/bloodhound/collectors/sharphound/
-COPY --from=hound-builder /tmp/azurehound/artifacts/azurehound-${AZUREHOUND_VERSION}.zip /etc/bloodhound/collectors/azurehound/
-COPY --from=hound-builder /tmp/azurehound/artifacts/azurehound-${AZUREHOUND_VERSION}.zip.sha256 /etc/bloodhound/collectors/azurehound/
+COPY --from=collectors /out/ /etc/bloodhound/collectors/
 
 ENTRYPOINT ["/bloodhound", "-configfile", "/bloodhound.config.json"]
