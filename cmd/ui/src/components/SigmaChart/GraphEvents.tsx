@@ -468,7 +468,7 @@ export const GraphEvents = forwardRef(function GraphEvents(
                         data.forceLabel &&
                         (camera.ratio <= LABEL_DECLUTTER_RATIO ||
                             node === highlightedItem ||
-                            getDeclutteredLabels(graph, camera.ratio).has(node)),
+                            getDeclutteredLabels(graph, camera.ratio, (pos) => sigma.graphToViewport(pos)).has(node)),
                     highlighted: node === highlightedItem,
                     isExploreGraphLabelClip,
                     inverseSqrtZoomRatio,

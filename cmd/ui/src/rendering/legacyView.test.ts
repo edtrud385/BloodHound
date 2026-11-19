@@ -14,8 +14,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { MultiDirectedGraph } from 'graphology';
 import {
     EDGE_LABEL_SIZE,
+    getDeclutteredLabels,
     getLabelScale,
     getLabelSizeMultiplier,
     getNodeHitRadius,
@@ -115,5 +117,33 @@ describe('getNodeHitRadius', () => {
         }
         // At ratio 25 sigma's own circle would be 5x the icon
         expect(getNodeHitRadius(30 / 5, 25)).toBeLessThan(30 / 5 / 1.5);
+    });
+});
+
+describe('getDeclutteredLabels', () => {
+    const build = (positions: [string, number, number][]) => {
+        const graph = new MultiDirectedGraph();
+        positions.forEach(([id, x, y]) => graph.addNode(id, { x, y, label: `${id}@CONTOSO.LOCAL` }));
+        return graph;
+    };
+
+    it('keeps every label that has room on screen, however large the graph coordinates are', () => {
+        // A column of users 80px apart on screen, in graph units 1000x larger (a big graph seen up close)
+        const graph = build([0, 1, 2, 3, 4, 5].map((i): [string, number, number] => [`USER${i}`, 0, i * 80000]));
+        const labels = getDeclutteredLabels(graph, 4, ({ x, y }) => ({ x: x / 1000, y: y / 1000 }));
+        expect(labels.size).toBe(6);
+    });
+
+    it('drops a label only where it would land on top of another one', () => {
+        const graph = build([
+            ['A', 0, 0],
+            ['B', 3, 4],
+            ['C', 0, 200],
+        ]);
+        graph.addEdge('A', 'C');
+        const labels = getDeclutteredLabels(graph, 4, (p) => p);
+        expect(labels.has('A')).toBe(true); // most connected wins the clash
+        expect(labels.has('B')).toBe(false);
+        expect(labels.has('C')).toBe(true);
     });
 });

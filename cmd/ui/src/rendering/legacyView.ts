@@ -429,13 +429,10 @@ export const stretchToAspect = (graph: MultiDirectedGraph, aspect: number): void
     });
 };
 
-/**
- * Screen-space cell (px) that may hold one label when zoomed out. Small on purpose: labels are
- * only dropped where they would pile almost exactly on top of each other, so nearly every name
- * stays on screen (Legacy shows all of them, overlapping).
- */
-const DECLUTTER_CELL_WIDTH = 100;
-const DECLUTTER_CELL_HEIGHT = 5;
+/** Gap kept between two labels (px) before one of them is dropped when zoomed out. */
+const DECLUTTER_LABEL_GAP = 2;
+/** Average glyph width as a fraction of the font size, for estimating a label's on-screen width. */
+const LABEL_CHAR_WIDTH = 0.62;
 
 const declutterCache = new WeakMap<object, { key: string; labels: Set<string> }>();
 
@@ -444,24 +441,32 @@ export const markLayoutChanged = (graph: MultiDirectedGraph): void => {
     graph.setAttribute('layoutVersion', (graph.getAttribute('layoutVersion') ?? 0) + 1);
 };
 
+type LabelBox = { left: number; right: number; top: number; bottom: number };
+
 /**
- * Pick which nodes get a label at the given zoom: at most one per screen cell, preferring
- * collapsed parents and then the most connected nodes (the chokepoints you want to read first).
+ * Pick which nodes get a label at the given zoom: every label that does not overlap one already
+ * placed on screen, placing collapsed parents and then the most connected nodes (the chokepoints
+ * you want to read first) first. Overlap is measured in screen pixels from each label's estimated
+ * size, so names are only dropped where they would really collide (earlier versions used a fixed
+ * cell in graph units, which hid well-spaced names on large graphs).
+ * `toScreen` maps a node's graph position to the viewport (sigma.graphToViewport); only distances
+ * between nodes matter, so panning does not change the result.
  * Cached per zoom step and layout, so the node reducer can call it for every node.
  */
 export const getDeclutteredLabels = (
     graph: MultiDirectedGraph<Attributes, Attributes, Attributes>,
-    cameraRatio: number
+    cameraRatio: number,
+    toScreen: (position: { x: number; y: number }) => { x: number; y: number }
 ): Set<string> => {
     const step = Math.round(Math.log(cameraRatio) * 8);
-    const key = `${step}:${graph.order}:${graph.getAttribute('layoutVersion') ?? 0}`;
+    const key = `${step}:${graph.order}:${graph.getAttribute('layoutVersion') ?? 0}:${labelSizeMultipliers.node}`;
     const cached = declutterCache.get(graph);
     if (cached && cached.key === key) return cached.labels;
 
-    const ratio = Math.exp(step / 8);
-    // At ratio 1 one graph unit is about one pixel (see resetCamera's custom bbox)
-    const cellWidth = DECLUTTER_CELL_WIDTH * ratio;
-    const cellHeight = DECLUTTER_CELL_HEIGHT * ratio;
+    const fontPx = NODE_LABEL_SIZE * getLabelScale(1 / Math.sqrt(cameraRatio));
+    const height = fontPx * 1.25;
+    // Bucket placed boxes into a coarse screen grid so each test only looks at neighbours
+    const bucket = Math.max(50, fontPx * 20);
 
     const candidates = graph
         .filterNodes((_node, attrs) => !attrs.hidden && !!attrs.label)
@@ -471,13 +476,36 @@ export const getDeclutteredLabels = (
         }))
         .sort((a, b) => b.priority - a.priority);
 
-    const taken = new Set<string>();
+    const grid = new Map<string, LabelBox[]>();
     const labels = new Set<string>();
     candidates.forEach(({ node }) => {
-        const { x, y } = graph.getNodeAttributes(node);
-        const cell = `${Math.floor(x / cellWidth)}:${Math.floor(y / cellHeight)}`;
-        if (taken.has(cell)) return;
-        taken.add(cell);
+        const attrs = graph.getNodeAttributes(node);
+        const { x, y } = toScreen({ x: attrs.x, y: attrs.y });
+        const width = String(attrs.label).length * fontPx * LABEL_CHAR_WIDTH;
+        // Labels are drawn centred under the node
+        const box: LabelBox = { left: x - width / 2, right: x + width / 2, top: y, bottom: y + height };
+        const cols = [Math.floor(box.left / bucket), Math.floor(box.right / bucket)];
+        const rows = [Math.floor(box.top / bucket), Math.floor(box.bottom / bucket)];
+        for (let cx = cols[0]; cx <= cols[1]; cx++) {
+            for (let cy = rows[0]; cy <= rows[1]; cy++) {
+                const overlaps = grid
+                    .get(`${cx}:${cy}`)
+                    ?.some(
+                        (other) =>
+                            box.left < other.right + DECLUTTER_LABEL_GAP &&
+                            other.left < box.right + DECLUTTER_LABEL_GAP &&
+                            box.top < other.bottom + DECLUTTER_LABEL_GAP &&
+                            other.top < box.bottom + DECLUTTER_LABEL_GAP
+                    );
+                if (overlaps) return;
+            }
+        }
+        for (let cx = cols[0]; cx <= cols[1]; cx++) {
+            for (let cy = rows[0]; cy <= rows[1]; cy++) {
+                const cell = `${cx}:${cy}`;
+                grid.set(cell, [...(grid.get(cell) ?? []), box]);
+            }
+        }
         labels.add(node);
     });
 
