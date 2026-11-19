@@ -4,6 +4,8 @@ This branch (`legacy-view`, based on CE `v9.8.0`) changes **only how the Explore
 Ingest, post-processing, edge creation, Tier Zero tagging, the API and storage are untouched, so
 it works the same whether CE stores its graph in Neo4j or PostgreSQL.
 
+For a screenshot tour of the changes, see the [README](README.md).
+
 ## What changes
 
 | Goal | How |
