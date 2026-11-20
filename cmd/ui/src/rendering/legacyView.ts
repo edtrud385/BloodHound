@@ -443,23 +443,74 @@ export const markLayoutChanged = (graph: MultiDirectedGraph): void => {
 
 type LabelBox = { left: number; right: number; top: number; bottom: number };
 
+let measureContext: CanvasRenderingContext2D | null | undefined;
+/** On-screen width of a node label in px: measured with the label font when a canvas is available. */
+const measureLabelWidth = (text: string, fontPx: number): number => {
+    if (measureContext === undefined) {
+        try {
+            measureContext = document.createElement('canvas').getContext('2d');
+        } catch {
+            measureContext = null;
+        }
+    }
+    if (measureContext) {
+        measureContext.font = `${NODE_LABEL_WEIGHT} ${fontPx}px Roboto, sans-serif`;
+        const width = measureContext.measureText(text).width;
+        // Ignore implausible results (e.g. canvas stubs that report one px per character)
+        if (width > text.length * fontPx * 0.3) return width;
+    }
+    return text.length * fontPx * LABEL_CHAR_WIDTH;
+};
+
+/**
+ * Which names win when labels would overlap: nodes with folded-in leaves, then Tier Zero / owned
+ * nodes (the ones with a badge), then the most connected.
+ */
+const getLabelPriority = (graph: MultiDirectedGraph<Attributes, Attributes, Attributes>, node: string): number => {
+    const attrs = graph.getNodeAttributes(node);
+    return (
+        (getCollapsedCount(attrs) ? 1e9 : 0) +
+        ((attrs.glyphs as unknown[] | undefined)?.length ? 1e6 : 0) +
+        graph.degree(node)
+    );
+};
+
+export type DeclutterView = {
+    /** Viewport size in px: only labels that would show on screen take part. */
+    width: number;
+    height: number;
+    /** Changes when the camera moves enough to change which nodes are on screen. */
+    key: string;
+    /** Nodes drawn hidden (edge filter, excluded objects): they neither get nor block a label. */
+    isHidden?: (node: string) => boolean;
+    /** Changes whenever isHidden would answer differently. */
+    hiddenKey?: string;
+};
+
 /**
  * Pick which nodes get a label at the given zoom: every label that does not overlap one already
- * placed on screen, placing collapsed parents and then the most connected nodes (the chokepoints
- * you want to read first) first. Overlap is measured in screen pixels from each label's estimated
- * size, so names are only dropped where they would really collide (earlier versions used a fixed
- * cell in graph units, which hid well-spaced names on large graphs).
- * `toScreen` maps a node's graph position to the viewport (sigma.graphToViewport); only distances
- * between nodes matter, so panning does not change the result.
- * Cached per zoom step and layout, so the node reducer can call it for every node.
+ * placed on screen, in the order of getLabelPriority (collapsed parents, Tier Zero / owned, then the
+ * most connected). Overlap is measured in screen pixels from each label's size.
+ * Only labels that would be visible on screen and nodes that are drawn take part, so an off-screen
+ * or hidden node never takes the place of a name you can see.
+ * `toScreen` maps a node's graph position to the viewport (sigma.graphToViewport).
+ * Cached per zoom step, camera position, layout and hidden set, so the node reducer can call it for every node.
  */
 export const getDeclutteredLabels = (
     graph: MultiDirectedGraph<Attributes, Attributes, Attributes>,
     cameraRatio: number,
-    toScreen: (position: { x: number; y: number }) => { x: number; y: number }
+    toScreen: (position: { x: number; y: number }) => { x: number; y: number },
+    view?: DeclutterView
 ): Set<string> => {
     const step = Math.round(Math.log(cameraRatio) * 8);
-    const key = `${step}:${graph.order}:${graph.getAttribute('layoutVersion') ?? 0}:${labelSizeMultipliers.node}`;
+    const key = [
+        step,
+        graph.order,
+        graph.getAttribute('layoutVersion') ?? 0,
+        labelSizeMultipliers.node,
+        view?.key ?? '',
+        view?.hiddenKey ?? '',
+    ].join(':');
     const cached = declutterCache.get(graph);
     if (cached && cached.key === key) return cached.labels;
 
@@ -469,10 +520,10 @@ export const getDeclutteredLabels = (
     const bucket = Math.max(50, fontPx * 20);
 
     const candidates = graph
-        .filterNodes((_node, attrs) => !attrs.hidden && !!attrs.label)
+        .filterNodes((node, attrs) => !attrs.hidden && !!attrs.label && !view?.isHidden?.(node))
         .map((node) => ({
             node,
-            priority: (getCollapsedCount(graph.getNodeAttributes(node)) ? 1e9 : 0) + graph.degree(node),
+            priority: getLabelPriority(graph, node),
         }))
         .sort((a, b) => b.priority - a.priority);
 
@@ -481,9 +532,10 @@ export const getDeclutteredLabels = (
     candidates.forEach(({ node }) => {
         const attrs = graph.getNodeAttributes(node);
         const { x, y } = toScreen({ x: attrs.x, y: attrs.y });
-        const width = String(attrs.label).length * fontPx * LABEL_CHAR_WIDTH;
+        const width = measureLabelWidth(shortenNodeLabel(String(attrs.label)), fontPx);
         // Labels are drawn centred under the node
         const box: LabelBox = { left: x - width / 2, right: x + width / 2, top: y, bottom: y + height };
+        if (view && (box.right < 0 || box.left > view.width || box.bottom < 0 || box.top > view.height)) return;
         const cols = [Math.floor(box.left / bucket), Math.floor(box.right / bucket)];
         const rows = [Math.floor(box.top / bucket), Math.floor(box.bottom / bucket)];
         for (let cx = cols[0]; cx <= cols[1]; cx++) {

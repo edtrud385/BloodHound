@@ -443,6 +443,23 @@ export const GraphEvents = forwardRef(function GraphEvents(
         const edgeBlend = darkMode ? 0.6 : 0.9;
         const labelDimFactor = darkMode ? 0.3 : 0.1;
 
+        // Legacy view: label decluttering looks only at nodes drawn on screen, so an off-screen or
+        // hidden node never takes the place of a name you can see
+        const hiddenKey = `${filteredOutNodes.size}:${edgeFilter.hiddenKinds.join(',')}:${edgeFilter.hideOrphans}:${excludedObjectIds.size}:${layoutVersion}`;
+        const getDeclutterView = () => {
+            const { width, height } = sigma.getDimensions();
+            const { x, y, ratio } = sigma.getCamera().getState();
+            // Recompute after the view moves by about a tenth of the screen (camera x/y are in
+            // framed-graph units, where the whole screen spans about `ratio`)
+            return {
+                width,
+                height,
+                key: `${width}x${height}:${Math.round((x * 10) / ratio)}:${Math.round((y * 10) / ratio)}`,
+                isHidden: (id: string) => filteredOutNodes.has(id),
+                hiddenKey,
+            };
+        };
+
         setSettings({
             nodeReducer: (node, data) => {
                 const camera = sigma.getCamera();
@@ -468,7 +485,12 @@ export const GraphEvents = forwardRef(function GraphEvents(
                         data.forceLabel &&
                         (camera.ratio <= LABEL_DECLUTTER_RATIO ||
                             node === highlightedItem ||
-                            getDeclutteredLabels(graph, camera.ratio, (pos) => sigma.graphToViewport(pos)).has(node)),
+                            getDeclutteredLabels(
+                                graph,
+                                camera.ratio,
+                                (pos) => sigma.graphToViewport(pos),
+                                getDeclutterView()
+                            ).has(node)),
                     highlighted: node === highlightedItem,
                     isExploreGraphLabelClip,
                     inverseSqrtZoomRatio,
@@ -535,6 +557,10 @@ export const GraphEvents = forwardRef(function GraphEvents(
         isHighlightedItemInGraph,
         isExploreGraphHighlight,
         isExploreGraphLabelClip,
+        edgeFilter.hiddenKinds,
+        edgeFilter.hideOrphans,
+        excludedObjectIds,
+        layoutVersion,
     ]);
 
     // Legacy view: pick nodes only where they are drawn. Sigma's own hit circle grows with sqrt(zoom-out)

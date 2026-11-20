@@ -147,3 +147,37 @@ describe('getDeclutteredLabels', () => {
         expect(labels.has('C')).toBe(true);
     });
 });
+
+describe('getDeclutteredLabels on screen', () => {
+    const view = (extra = {}) => ({ width: 1000, height: 800, key: 'v', ...extra });
+
+    it('gives the name to a Tier Zero node when labels collide', () => {
+        const graph = new MultiDirectedGraph();
+        graph.addNode('USER', { x: 100, y: 300, label: 'SOME USER WITH A LONG NAME@CONTOSO.LOCAL' });
+        graph.addNode('T0', { x: 160, y: 302, label: 'SCHEMA ADMINS@CONTOSO.LOCAL', glyphs: [{}] });
+        ['a', 'b', 'c'].forEach((n) => {
+            graph.addNode(n, { x: 900, y: 700 + n.charCodeAt(0), label: n });
+            graph.addEdge('USER', n);
+        });
+        const labels = getDeclutteredLabels(graph, 4, (p) => p, view({ key: 't0' }));
+        expect(labels.has('T0')).toBe(true);
+        expect(labels.has('USER')).toBe(false);
+    });
+
+    it('ignores nodes the graph hides', () => {
+        const graph = new MultiDirectedGraph();
+        graph.addNode('HIDDEN', { x: 100, y: 100, label: 'HIDDEN@CONTOSO.LOCAL' });
+        graph.addNode('SHOWN', { x: 102, y: 102, label: 'SHOWN@CONTOSO.LOCAL' });
+        graph.addEdge('HIDDEN', 'SHOWN');
+        graph.addNode('x', { x: 900, y: 700, label: 'x' });
+        graph.addEdge('HIDDEN', 'x');
+        const labels = getDeclutteredLabels(
+            graph,
+            4,
+            (p) => p,
+            view({ key: 'hid', isHidden: (n: string) => n === 'HIDDEN', hiddenKey: '1' })
+        );
+        expect(labels.has('SHOWN')).toBe(true);
+        expect(labels.has('HIDDEN')).toBe(false);
+    });
+});
